@@ -4,10 +4,10 @@ import { sessionValid, readSession } from "@/lib/auth";
 
 export const runtime = "edge";
 
-export default async function Home({ request }: { request?: Request }) {
+export default async function Home() {
     let session = null;
     try {
-        session = await readSession(request);
+        session = await readSession();
     } catch (err) {
         console.error("readSession failed", err);
     }

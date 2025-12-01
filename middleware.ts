@@ -18,6 +18,18 @@ function isPublic(pathname: string) {
     );
 }
 
+function extractToken(req: NextRequest) {
+    const header = req.headers.get("cookie");
+    if (header) {
+        const parts = header.split(";").map((p) => p.trim());
+        const found = parts.find((p) => p.startsWith(`${sessionCookieName}=`));
+        if (found) {
+            return decodeURIComponent(found.split("=", 2)[1] || "");
+        }
+    }
+    return req.cookies.get(sessionCookieName)?.value;
+}
+
 async function verify(token: string | undefined) {
     if (!token) return null;
     const secret = process.env.STAMPIFY_SESSION_SECRET;
@@ -42,7 +54,7 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
-    const token = req.cookies.get(sessionCookieName)?.value;
+    const token = extractToken(req);
     const session = await verify(token);
 
     if (!session) {
