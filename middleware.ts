@@ -51,7 +51,10 @@ export async function middleware(req: NextRequest) {
         return NextResponse.redirect(loginUrl);
     }
 
-    return NextResponse.next();
+    // Pass through session to downstream via header (helps diagnose)
+    const res = NextResponse.next();
+    res.headers.set("x-session-user", (session as any)?.username || "");
+    return res;
 }
 
 export const config = {
