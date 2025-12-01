@@ -3,8 +3,8 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "build": "TURBOPACK=0 next build",
-        "dev": "TURBOPACK=0 next dev",
+        "build": "NEXT_DISABLE_TURBOPACK=1 NEXT_PRIVATE_TEST_TURBOPACK=0 NEXT_FORCE_WEBPACK=1 TURBOPACK=0 next build",
+        "dev": "NEXT_DISABLE_TURBOPACK=1 NEXT_PRIVATE_TEST_TURBOPACK=0 NEXT_FORCE_WEBPACK=1 TURBOPACK=0 next dev",
         "lint": "eslint .",
         "start": "next start"
     },

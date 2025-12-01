@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from "next";
 /* Vercel Analytics import removed */
 import "./globals.css";
 
+export const runtime = "edge";
+
 export const metadata: Metadata = {
     title: "SKU Image Processor",
     description:

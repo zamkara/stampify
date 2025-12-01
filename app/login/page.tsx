@@ -5,6 +5,8 @@ export const metadata = {
     title: "Login | Stampify",
 };
 
+export const runtime = "edge";
+
 export default function LoginPage() {
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center px-4">
