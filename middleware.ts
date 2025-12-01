@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { jwtVerify } from "jose";
+import type { NextRequest } from "next/server";
+
+const sessionCookieName = "stampify_session";
+const publicPaths = [
+    "/login",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/me",
+];
+
+function isPublic(pathname: string) {
+    return (
+        publicPaths.some((p) => pathname.startsWith(p)) ||
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/static")
+    );
+}
+
+async function verify(token: string | undefined) {
+    if (!token) return null;
+    const secret = process.env.STAMPIFY_SESSION_SECRET;
+    if (!secret) return null;
+    try {
+        const { payload } = await jwtVerify(
+            token,
+            new TextEncoder().encode(secret),
+        );
+        const { status, disabled, remainingDays } = payload as any;
+        if (disabled || status !== "active" || (remainingDays ?? 0) <= 0)
+            return null;
+        return payload;
+    } catch {
+        return null;
+    }
+}
+
+export async function middleware(req: NextRequest) {
+    const { pathname } = req.nextUrl;
+    if (isPublic(pathname)) {
+        return NextResponse.next();
+    }
+
+    const token = req.cookies.get(sessionCookieName)?.value;
+    const session = await verify(token);
+
+    if (!session) {
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("redirect", req.nextUrl.pathname);
+        return NextResponse.redirect(loginUrl);
+    }
+
+    return NextResponse.next();
+}
+
+export const config = {
+    matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+};
