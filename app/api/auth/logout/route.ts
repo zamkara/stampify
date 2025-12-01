@@ -1,9 +1,7 @@
-import { NextResponse } from "next/server";
-import { clearSession } from "@/lib/auth";
+import { clearSessionResponse } from "@/lib/auth";
 
 export const runtime = "edge";
 
 export async function POST() {
-    clearSession();
-    return NextResponse.json({ success: true });
+    return clearSessionResponse({ success: true });
 }

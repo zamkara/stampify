@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSession } from "@/lib/auth";
+import { createSessionResponse } from "@/lib/auth";
 
 const STAMPSU_BASE =
     process.env.STAMPSU_BASE_URL || "https://stampsu.zamkara.workers.dev";
@@ -50,15 +50,16 @@ export async function POST(req: Request) {
             username: string;
         };
 
-        await createSession({
-            username: data.username,
-            status: data.status,
-            expiresAt: data.expiresAt,
-            remainingDays: data.remainingDays,
-            disabled: data.disabled,
-        });
-
-        return NextResponse.json({ success: true, data });
+        return await createSessionResponse(
+            {
+                username: data.username,
+                status: data.status,
+                expiresAt: data.expiresAt,
+                remainingDays: data.remainingDays,
+                disabled: data.disabled,
+            },
+            { success: true, data },
+        );
     } catch (err) {
         return NextResponse.json(
             {
