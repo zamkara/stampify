@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+export const runtime = 'edge'
 import JSZip from "jszip"
 
 export async function POST(request: NextRequest) {
@@ -23,9 +24,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" })
+    const zipArrayBuffer = await zip.generateAsync({ type: "arraybuffer" })
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(zipArrayBuffer, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": "attachment; filename=catalogs.zip",

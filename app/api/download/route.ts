@@ -1,4 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
+export const runtime = 'edge'
+
+function toBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -149,7 +159,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const base64 = Buffer.from(imageBuffer).toString("base64")
+    const base64 = toBase64(imageBuffer)
 
     // Determine content type from buffer magic bytes
     const bytes = new Uint8Array(imageBuffer.slice(0, 4))
