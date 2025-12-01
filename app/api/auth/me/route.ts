@@ -7,7 +7,14 @@ export async function GET() {
     const session = await readSession();
     if (!sessionValid(session)) {
         return NextResponse.json(
-            { success: false, message: "Unauthenticated" },
+            {
+                success: false,
+                message: "Unauthenticated",
+                reason: session
+                    ? "Session not active/expired/disabled"
+                    : "No session",
+                session,
+            },
             { status: 401 },
         );
     }

@@ -12,6 +12,12 @@ export type SessionPayload = {
 };
 
 const sessionCookieName = "stampify_session";
+const cookieBase = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    secure: true, // always secure because served via HTTPS on Pages
+};
 
 function getSecretBuffer() {
     const secret = process.env.STAMPIFY_SESSION_SECRET;
@@ -41,9 +47,7 @@ export async function createSessionResponse<T>(
     res.cookies.set({
         name: sessionCookieName,
         value: token,
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
+        ...cookieBase,
         maxAge: 60 * 60 * 12,
     });
     return res;
@@ -54,9 +58,7 @@ export function clearSessionResponse<T>(body: T, status = 200) {
     res.cookies.set({
         name: sessionCookieName,
         value: "",
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
+        ...cookieBase,
         maxAge: 0,
     });
     return res;
