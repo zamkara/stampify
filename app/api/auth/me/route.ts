@@ -3,9 +3,9 @@ import { readSession, sessionValid } from "@/lib/auth";
 
 export const runtime = "edge";
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const session = await readSession();
+        const session = await readSession(req);
         if (!sessionValid(session)) {
             return NextResponse.json(
                 {

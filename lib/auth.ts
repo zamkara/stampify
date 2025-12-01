@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 
 export type SessionStatus = "active" | "expired" | "disabled";
@@ -64,8 +65,29 @@ export function clearSessionResponse<T>(body: T, status = 200) {
     return res;
 }
 
-export async function readSession(): Promise<SessionPayload | null> {
-    const token = cookies().get(sessionCookieName)?.value;
+function extractTokenFromHeader(req?: Request | NextRequest) {
+    const cookieHeader = req?.headers.get("cookie");
+    if (!cookieHeader) return null;
+    const parts = cookieHeader.split(";").map((p) => p.trim());
+    const tokenPart = parts.find((p) => p.startsWith(`${sessionCookieName}=`));
+    if (!tokenPart) return null;
+    return decodeURIComponent(tokenPart.split("=", 2)[1] || "");
+}
+
+export async function readSession(
+    req?: Request | NextRequest,
+): Promise<SessionPayload | null> {
+    let token: string | undefined | null = extractTokenFromHeader(req);
+
+    if (!token) {
+        try {
+            // Fallback for server components / environments where cookies() works
+            token = cookies().get(sessionCookieName)?.value;
+        } catch {
+            token = null;
+        }
+    }
+
     if (!token) return null;
     const secret = getSecretBuffer();
     if (!secret) return null;
