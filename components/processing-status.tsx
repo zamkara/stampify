@@ -1,5 +1,5 @@
 import type { ProcessingState } from "./sku-processor"
-import { Loader2, CheckCircle2, AlertCircle, Download, Cog } from "lucide-react"
+import { Loader2, CheckCircle2, AlertCircle, Download, Cog, FileArchive } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProcessingStatusProps {
@@ -28,6 +28,12 @@ export function ProcessingStatus({ state, progress, error }: ProcessingStatusPro
           icon: Cog,
           title: "Applying frame overlay...",
           iconClass: "animate-spin text-foreground",
+        }
+      case "zipping":
+        return {
+          icon: FileArchive,
+          title: "Creating ZIP...",
+          iconClass: "animate-pulse text-foreground",
         }
       case "complete":
         return {

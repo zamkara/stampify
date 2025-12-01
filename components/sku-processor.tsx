@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import JSZip from "jszip"
 import { FileUploadZone } from "./file-upload-zone"
 import { CatalogPreview } from "./catalog-preview"
 import { ProcessingStatus } from "./processing-status"
@@ -9,7 +10,7 @@ import { parseSKUFile, type Catalog } from "@/lib/sku-parser"
 import { Button } from "@/components/ui/button"
 import { Download, Play, Trash2, RotateCcw } from "lucide-react"
 
-export type ProcessingState = "idle" | "parsing" | "downloading" | "processing" | "complete" | "error"
+export type ProcessingState = "idle" | "parsing" | "downloading" | "processing" | "zipping" | "complete" | "error"
 
 export function SkuProcessor() {
   const [skuFile, setSkuFile] = useState<File | null>(null)
@@ -243,20 +244,36 @@ export function SkuProcessor() {
   }
 
   const handleDownloadZip = async () => {
-    const response = await fetch("/api/create-zip", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ catalogs: processedImages }),
-    })
+    if (!processedImages.length) return
+    setProcessingState("zipping")
+    setProgress({ current: 0, total: 100, message: "Creating ZIP..." })
 
-    if (response.ok) {
-      const blob = await response.blob()
+    try {
+      const zip = new JSZip()
+
+      for (const cat of processedImages) {
+        const folder = zip.folder(cat.catalog)!
+        cat.images.forEach((img, idx) => {
+          const base64 = img.split(",")[1] || ""
+          folder.file(`${cat.catalog}-${idx + 1}.png`, base64, { base64: true })
+        })
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" }, (metadata) => {
+        setProgress({ current: Math.round(metadata.percent), total: 100, message: "Creating ZIP..." })
+      })
+
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
       a.download = "catalogs.zip"
       a.click()
       URL.revokeObjectURL(url)
+
+      setProcessingState("complete")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create ZIP")
+      setProcessingState("error")
     }
   }
 
@@ -281,7 +298,8 @@ export function SkuProcessor() {
 
   const totalUrls = catalogs.reduce((acc, cat) => acc + cat.urls.length, 0)
   const canProcess = catalogs.length > 0 && processingState === "idle"
-  const isProcessing = processingState === "downloading" || processingState === "processing"
+  const isProcessing =
+    processingState === "downloading" || processingState === "processing" || processingState === "zipping"
   const isComplete = processingState === "complete"
   const hasImages = processedImages.length > 0 && processedImages.some((cat) => cat.images.length > 0)
   const totalProcessed = processedImages.reduce((acc, cat) => acc + cat.images.length, 0)
