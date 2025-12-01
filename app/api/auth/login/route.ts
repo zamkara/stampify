@@ -50,6 +50,22 @@ export async function POST(req: Request) {
             username: string;
         };
 
+        if (
+            data.disabled ||
+            data.status !== "active" ||
+            (data.remainingDays ?? 0) <= 0
+        ) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: data.disabled
+                        ? "Akun dinonaktifkan"
+                        : "Langganan sudah kedaluwarsa",
+                },
+                { status: 403 },
+            );
+        }
+
         return await createSessionResponse(
             {
                 username: data.username,
