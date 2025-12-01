@@ -13,10 +13,18 @@ export type SessionPayload = {
 
 const sessionCookieName = "stampify_session";
 
-function getSecret() {
+function getSecretBuffer() {
     const secret = process.env.STAMPIFY_SESSION_SECRET;
-    if (!secret) throw new Error("STAMPIFY_SESSION_SECRET belum diatur");
+    if (!secret) return null;
     return new TextEncoder().encode(secret);
+}
+
+function ensureSecretBuffer() {
+    const buf = getSecretBuffer();
+    if (!buf) {
+        throw new Error("STAMPIFY_SESSION_SECRET belum diatur");
+    }
+    return buf;
 }
 
 export async function createSessionResponse<T>(
@@ -27,7 +35,7 @@ export async function createSessionResponse<T>(
     const token = await new SignJWT(payload)
         .setProtectedHeader({ alg: "HS256" })
         .setExpirationTime("12h")
-        .sign(getSecret());
+        .sign(ensureSecretBuffer());
 
     const res = NextResponse.json(body, { status });
     res.cookies.set({
@@ -57,8 +65,10 @@ export function clearSessionResponse<T>(body: T, status = 200) {
 export async function readSession(): Promise<SessionPayload | null> {
     const token = cookies().get(sessionCookieName)?.value;
     if (!token) return null;
+    const secret = getSecretBuffer();
+    if (!secret) return null;
     try {
-        const { payload } = await jwtVerify(token, getSecret());
+        const { payload } = await jwtVerify(token, secret);
         return payload as SessionPayload;
     } catch {
         return null;

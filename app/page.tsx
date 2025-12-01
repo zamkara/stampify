@@ -5,7 +5,13 @@ import { sessionValid, readSession } from "@/lib/auth";
 export const runtime = "edge";
 
 export default async function Home() {
-    const session = await readSession();
+    let session = null;
+    try {
+        session = await readSession();
+    } catch (err) {
+        console.error("readSession failed", err);
+    }
+
     if (!sessionValid(session)) {
         redirect("/login?redirect=/");
     }
