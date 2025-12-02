@@ -28,7 +28,7 @@ export default function LoginPage() {
                             className="w-10 h-10"
                         />
                     </div>
-                    <div className="">
+                    <div>
                         Stampify
                         <p className="text-center text-xs text-muted-foreground">
                             By{" "}

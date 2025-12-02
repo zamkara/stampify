@@ -70,7 +70,7 @@ export function Header() {
                                 ) : (
                                     <LogOut className="h-3 w-3" />
                                 )}
-                                {loggingOut ? "Keluar..." : "Keluar"}
+                                {loggingOut ? "Logging out..." : "Log out"}
                             </button>
                         </>
                     )}

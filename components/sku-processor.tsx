@@ -7,7 +7,7 @@ import { CatalogPreview } from "./catalog-preview";
 import { ProcessingStatus } from "./processing-status";
 import { Header } from "./header";
 import { parseSKUFile, type Catalog } from "@/lib/sku-parser";
-import { Button } from "@/components/ui/button";
+import { OrangeButton } from "@/components/ui/actbutton";
 import {
     Download,
     Play,
@@ -452,7 +452,7 @@ export function SkuProcessor() {
                                         }
                                     />
                                     <div className="flex justify-end">
-                                        <Button
+                                        <OrangeButton
                                             onClick={handlePasteParse}
                                             disabled={parsingPaste}
                                         >
@@ -462,7 +462,7 @@ export function SkuProcessor() {
                                             {parsingPaste
                                                 ? "Processing..."
                                                 : "Parse text"}
-                                        </Button>
+                                        </OrangeButton>
                                     </div>
                                 </div>
                             </TabsContent>
@@ -497,25 +497,22 @@ export function SkuProcessor() {
                                     </p>
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                                    <OrangeButton
                                         onClick={handleReset}
                                         disabled={isProcessing}
                                     >
                                         <Trash2 className="w-4 h-4 mr-2" />
                                         Reset
-                                    </Button>
-                                    <Button
+                                    </OrangeButton>
+                                    <OrangeButton
                                         onClick={handleProcess}
                                         disabled={!canProcess || isProcessing}
-                                        size="sm"
                                     >
                                         <Play className="w-4 h-4 mr-2" />
                                         {isProcessing
                                             ? "Processing..."
                                             : "Process Images"}
-                                    </Button>
+                                    </OrangeButton>
                                 </div>
                             </div>
                             <CatalogPreview catalogs={catalogs} />
@@ -549,20 +546,21 @@ export function SkuProcessor() {
                                 </div>
                                 <div className="flex gap-3">
                                     {failedDownloads.length > 0 && (
-                                        <Button
-                                            variant="outline"
+                                        <OrangeButton
                                             onClick={handleRetryFailed}
                                         >
                                             <RotateCcw className="w-4 h-4 mr-2" />
                                             Retry Failed (
                                             {failedDownloads.length})
-                                        </Button>
+                                        </OrangeButton>
                                     )}
                                     {hasImages && (
-                                        <Button onClick={handleDownloadZip}>
+                                        <OrangeButton
+                                            onClick={handleDownloadZip}
+                                        >
                                             <Download className="w-4 h-4 mr-2" />
-                                            Download All (ZIP)
-                                        </Button>
+                                            Download All
+                                        </OrangeButton>
                                     )}
                                 </div>
                             </div>

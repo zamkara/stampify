@@ -56,7 +56,7 @@ export function FileUploadZone({
                 "relative rounded-xl border-2 border-dashed p-8 transition-all cursor-pointer",
                 "hover:border-muted-foreground/50 hover:bg-card/50",
                 isDragActive && "border-foreground bg-card",
-                file ? "border-green-500/50 bg-green-500/5" : "border-border",
+                file ? "border-orange-200/10" : "border-border",
                 className,
             )}
         >
@@ -66,11 +66,11 @@ export function FileUploadZone({
                 <div
                     className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center",
-                        file ? "bg-green-500/10" : "bg-muted",
+                        file ? "bg-orange-200/10" : "bg-muted",
                     )}
                 >
                     {file ? (
-                        <CheckCircle2 className="w-6 h-6 text-green-500" />
+                        <CheckCircle2 className="w-6 h-6 text-orange-200" />
                     ) : (
                         <IconComponent className="w-6 h-6 text-muted-foreground" />
                     )}
@@ -85,14 +85,14 @@ export function FileUploadZone({
 
                 {file ? (
                     <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border">
                             <IconComponent className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm text-foreground truncate max-w-[200px]">
                                 {file.name}
                             </span>
                         </div>
                         {subtitle && (
-                            <span className="text-xs text-green-500">
+                            <span className="text-xs text-orange-200">
                                 {subtitle}
                             </span>
                         )}

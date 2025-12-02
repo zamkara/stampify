@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { OrangeButton } from "@/components/ui/actbutton";
 import { Label } from "@/components/ui/label";
 import {
     Card,
@@ -47,7 +47,7 @@ export function LoginForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="border-border bg-card">
+            <Card className="border-border rounded-3xl bg-card">
                 <CardHeader className="text-center">
                     <CardTitle className="text-xl text-foreground">
                         Welcome back
@@ -63,12 +63,12 @@ export function LoginForm({
                                 className="text-sm text-foreground"
                                 htmlFor="username"
                             >
-                                Username
+                                username
                             </Label>
                             <Input
                                 id="username"
                                 name="username"
-                                className="bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
+                                className="bg-background/20 mt-2 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -80,27 +80,29 @@ export function LoginForm({
                                 className="text-sm text-foreground"
                                 htmlFor="password"
                             >
-                                Password
+                                password
                             </Label>
                             <Input
                                 id="password"
                                 name="password"
                                 type="password"
-                                className="bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
+                                className="bg-background/20 mt-2 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 autoComplete="current-password"
                             />
                         </div>
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
-                        >
-                            {loading && <Spinner className="mr-2" />}
-                            {loading ? "Signing in..." : "Sign in"}
-                        </Button>
+                        <div className="w-full items-center justify-center flex">
+                            <OrangeButton
+                                type="submit"
+                                disabled={loading}
+                                className="disabled:opacity-60"
+                            >
+                                {loading && <Spinner className="mr-2" />}
+                                {loading ? "Signing in..." : "Sign in"}
+                            </OrangeButton>
+                        </div>
                         {error && (
                             <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-900">
                                 {error}
