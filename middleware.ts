@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 
+// Cloudflare Pages needs edge runtime; use experimental-edge per Next.js warning.
+export const runtime = "experimental-edge";
+
 const sessionCookieName = "stampify_session";
 const publicPaths = [
     "/login",
@@ -48,7 +51,7 @@ async function verify(token: string | undefined) {
     }
 }
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;
     if (isPublic(pathname)) {
         return NextResponse.next();
