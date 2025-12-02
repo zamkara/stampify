@@ -109,10 +109,6 @@ export function LoginForm({
                     </form>
                 </CardContent>
             </Card>
-            <p className="text-center text-sm text-muted-foreground px-6">
-                By signing in, you agree to Stampify terms of service and
-                privacy policy.
-            </p>
         </div>
     );
 }
