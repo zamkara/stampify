@@ -43,7 +43,17 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className="font-sans antialiased">
-                {children}
+                <div className="flex min-h-screen flex-col">
+                    {children}
+                    <footer className="ease-in-out duration-300 transition-all mx-auto items-center justify-center py-4 text-sm text-muted-foreground">
+                        <a
+                            href="https://github.com/zamkara"
+                            className="hover:text-foreground"
+                        >
+                            © 2025 Almatera incubator
+                        </a>
+                    </footer>
+                </div>
                 {/* Vercel Analytics removed */}
             </body>
         </html>

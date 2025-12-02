@@ -430,6 +430,7 @@ export function SkuProcessor() {
                                     title="Upload SKU File"
                                     description="Text/TSV file containing catalog names and Google Drive links"
                                     accept=".txt,.tsv,.csv"
+                                    className="-mb-4"
                                     onUpload={handleSkuUpload}
                                     file={skuFile}
                                     icon="file"
@@ -440,8 +441,7 @@ export function SkuProcessor() {
                                 <div className="rounded-xl border bg-card p-4 space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ClipboardPaste className="w-4 h-4" />
-                                        Paste list of links (one per line, can
-                                        include catalog name + URL)
+                                        Paste list of links
                                     </div>
                                     <Textarea
                                         className="min-h-[180px]"

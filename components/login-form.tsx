@@ -68,7 +68,7 @@ export function LoginForm({
                             <Input
                                 id="username"
                                 name="username"
-                                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
+                                className="bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -86,7 +86,7 @@ export function LoginForm({
                                 id="password"
                                 name="password"
                                 type="password"
-                                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
+                                className="bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
