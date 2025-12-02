@@ -1,5 +1,6 @@
+import { GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
-import LoginForm from "@/components/login-form";
+import { LoginForm } from "@/components/login-form";
 
 export const metadata = {
     title: "Login | Stampify",
@@ -9,29 +10,28 @@ export const runtime = "edge";
 
 export default function LoginPage() {
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center px-4">
-            <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
-                <div className="space-y-2 text-center">
-                    <p className="text-xs uppercase tracking-[0.25em] text-white/60">
-                        Stampify Access
-                    </p>
-                    <h1 className="text-2xl font-semibold">Masuk</h1>
-                    <p className="text-sm text-white/60">
-                        Gunakan akun yang dikelola dari Stampsu untuk
-                        melanjutkan.
-                    </p>
-                </div>
+        <div className="bg-stone-100 min-h-svh flex flex-col items-center justify-center gap-6 p-6 md:p-10">
+            <div className="flex w-full max-w-sm flex-col gap-6">
+                <Link
+                    href="#"
+                    className="flex items-center gap-2 self-center font-medium text-stone-800"
+                >
+                    <div className="bg-stone-900 text-stone-50 flex size-8 items-center justify-center rounded-xl shadow-sm">
+                        <GalleryVerticalEnd className="size-4" />
+                    </div>
+                    Stampify
+                </Link>
                 <LoginForm />
-                <p className="text-center text-xs text-white/50">
-                    Manajemen user:{" "}
+                <p className="text-center text-xs text-stone-500">
+                    Pengelolaan user:{" "}
                     <Link
-                        className="text-primary underline-offset-4 hover:underline"
+                        className="text-stone-800 underline-offset-4 hover:underline"
                         href="https://stampsu.zamkara.workers.dev"
                     >
                         Stampsu
                     </Link>
                 </p>
             </div>
-        </main>
+        </div>
     );
 }

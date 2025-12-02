@@ -4,9 +4,20 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
-export default function LoginForm() {
+export function LoginForm({
+    className,
+    ...props
+}: React.ComponentProps<"div">) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,54 +46,73 @@ export default function LoginForm() {
     }
 
     return (
-        <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-2">
-                <Label className="text-sm text-white/80" htmlFor="username">
-                    Username
-                </Label>
-                <Input
-                    id="username"
-                    name="username"
-                    className={cn(
-                        "bg-white/5 border-white/10 text-white placeholder:text-white/40",
-                        "focus-visible:ring-primary",
-                    )}
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoComplete="username"
-                />
-            </div>
-            <div className="space-y-2">
-                <Label className="text-sm text-white/80" htmlFor="password">
-                    Password
-                </Label>
-                <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    className={cn(
-                        "bg-white/5 border-white/10 text-white placeholder:text-white/40",
-                        "focus-visible:ring-primary",
-                    )}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                />
-            </div>
-            <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary text-slate-900 hover:opacity-90 disabled:opacity-60"
-            >
-                {loading ? "Masuk..." : "Masuk"}
-            </Button>
-            {error && (
-                <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-                    {error}
-                </div>
-            )}
-        </form>
+        <div className={cn("flex flex-col gap-6", className)} {...props}>
+            <Card className="border-stone-200 bg-stone-50/90">
+                <CardHeader className="text-center">
+                    <CardTitle className="text-xl text-stone-900">
+                        Selamat datang
+                    </CardTitle>
+                    <CardDescription className="text-stone-600">
+                        Gunakan akun Stampsu untuk masuk ke Stampify
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form className="space-y-4" onSubmit={onSubmit}>
+                        <div className="space-y-2">
+                            <Label
+                                className="text-sm text-stone-800"
+                                htmlFor="username"
+                            >
+                                Username
+                            </Label>
+                            <Input
+                                id="username"
+                                name="username"
+                                className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-stone-400"
+                                required
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                autoComplete="username"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label
+                                className="text-sm text-stone-800"
+                                htmlFor="password"
+                            >
+                                Password
+                            </Label>
+                            <Input
+                                id="password"
+                                name="password"
+                                type="password"
+                                className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-stone-400"
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="current-password"
+                            />
+                        </div>
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-stone-900 text-stone-50 hover:bg-stone-800 disabled:opacity-60"
+                        >
+                            {loading && <Spinner className="mr-2" />}
+                            {loading ? "Memproses..." : "Masuk"}
+                        </Button>
+                        {error && (
+                            <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-900">
+                                {error}
+                            </div>
+                        )}
+                    </form>
+                </CardContent>
+            </Card>
+            <p className="text-center text-sm text-stone-600 px-6">
+                Dengan masuk, Anda setuju pada ketentuan layanan dan kebijakan
+                privasi Stampify.
+            </p>
+        </div>
     );
 }

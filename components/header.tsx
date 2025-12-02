@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import logo from "@/public/icon.svg";
 import Image from "next/image";
-import Link from "next/link";
 import { LogOut } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 export function Header() {
     const [session, setSession] = useState<{
         username: string;
         remainingDays: number;
     } | null>(null);
+    const [loggingOut, setLoggingOut] = useState(false);
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -22,6 +23,15 @@ export function Header() {
             })
             .catch(() => {});
     }, []);
+
+    const handleLogout = async () => {
+        setLoggingOut(true);
+        try {
+            await fetch("/api/auth/logout", { method: "POST" });
+        } finally {
+            window.location.href = "/login";
+        }
+    };
 
     return (
         <header className="border-transparent hover:border-border border-b group bg-transparent hover:bg-card/50 ease-in-out duration-300 backdrop-blur-sm sticky top-0 py-4 z-50">
@@ -50,12 +60,18 @@ export function Header() {
                             <span className="text-white/60">
                                 Sisa {session.remainingDays} hari
                             </span>
-                            <form action="/api/auth/logout" method="post">
-                                <button className="rounded-full border border-white/10 px-3 py-1 hover:bg-white/10 inline-flex items-center gap-1">
+                            <button
+                                onClick={handleLogout}
+                                className="rounded-full border border-white/10 px-3 py-1 hover:bg-white/10 inline-flex items-center gap-1 disabled:opacity-60"
+                                disabled={loggingOut}
+                            >
+                                {loggingOut ? (
+                                    <Spinner className="h-3 w-3" />
+                                ) : (
                                     <LogOut className="h-3 w-3" />
-                                    Keluar
-                                </button>
-                            </form>
+                                )}
+                                {loggingOut ? "Keluar..." : "Keluar"}
+                            </button>
                         </>
                     )}
                 </div>
