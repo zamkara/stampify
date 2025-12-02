@@ -1,5 +1,6 @@
 import type { ProcessingState } from "./sku-processor"
 import { Loader2, CheckCircle2, AlertCircle, Download, Cog, FileArchive } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
 interface ProcessingStatusProps {
@@ -13,27 +14,27 @@ export function ProcessingStatus({ state, progress, error }: ProcessingStatusPro
     switch (state) {
       case "parsing":
         return {
-          icon: Loader2,
+          icon: Spinner,
           title: "Parsing SKU file...",
-          iconClass: "animate-spin text-foreground",
+          iconClass: "text-foreground",
         }
       case "downloading":
         return {
-          icon: Download,
+          icon: Spinner,
           title: "Downloading images...",
-          iconClass: "animate-pulse text-foreground",
+          iconClass: "text-foreground",
         }
       case "processing":
         return {
-          icon: Cog,
+          icon: Spinner,
           title: "Applying frame overlay...",
-          iconClass: "animate-spin text-foreground",
+          iconClass: "text-foreground",
         }
       case "zipping":
         return {
-          icon: FileArchive,
+          icon: Spinner,
           title: "Creating ZIP...",
-          iconClass: "animate-pulse text-foreground",
+          iconClass: "text-foreground",
         }
       case "complete":
         return {

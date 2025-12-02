@@ -23,7 +23,7 @@ export default function LoginPage() {
                 </Link>
                 <LoginForm />
                 <p className="text-center text-xs text-stone-500">
-                    Pengelolaan user:{" "}
+                    Manage users at{" "}
                     <Link
                         className="text-stone-800 underline-offset-4 hover:underline"
                         href="https://stampsu.zamkara.workers.dev"

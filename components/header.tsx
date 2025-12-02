@@ -58,7 +58,7 @@ export function Header() {
                                 {session.username}
                             </span>
                             <span className="text-white/60">
-                                Sisa {session.remainingDays} hari
+                                {session.remainingDays} days left
                             </span>
                             <button
                                 onClick={handleLogout}

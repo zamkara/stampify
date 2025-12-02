@@ -35,11 +35,11 @@ export function LoginForm({
             });
             const body = await res.json();
             if (!res.ok || !body?.success) {
-                throw new Error(body?.message || "Login gagal");
+                throw new Error(body?.message || "Login failed");
             }
             window.location.href = "/";
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Login gagal");
+            setError(err instanceof Error ? err.message : "Login failed");
         } finally {
             setLoading(false);
         }
@@ -50,10 +50,10 @@ export function LoginForm({
             <Card className="border-stone-200 bg-stone-50/90">
                 <CardHeader className="text-center">
                     <CardTitle className="text-xl text-stone-900">
-                        Selamat datang
+                        Welcome back
                     </CardTitle>
                     <CardDescription className="text-stone-600">
-                        Gunakan akun Stampsu untuk masuk ke Stampify
+                        Use your Stampsu account to access Stampify
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -99,7 +99,7 @@ export function LoginForm({
                             className="w-full bg-stone-900 text-stone-50 hover:bg-stone-800 disabled:opacity-60"
                         >
                             {loading && <Spinner className="mr-2" />}
-                            {loading ? "Memproses..." : "Masuk"}
+                            {loading ? "Signing in..." : "Sign in"}
                         </Button>
                         {error && (
                             <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-900">
@@ -110,8 +110,8 @@ export function LoginForm({
                 </CardContent>
             </Card>
             <p className="text-center text-sm text-stone-600 px-6">
-                Dengan masuk, Anda setuju pada ketentuan layanan dan kebijakan
-                privasi Stampify.
+                By signing in, you agree to Stampify terms of service and
+                privacy policy.
             </p>
         </div>
     );

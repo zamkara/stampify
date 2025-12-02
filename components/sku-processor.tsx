@@ -419,33 +419,33 @@ export function SkuProcessor() {
                         <Tabs defaultValue="upload" className="space-y-4">
                             <TabsList className="grid grid-cols-2 w-full">
                                 <TabsTrigger value="upload">
-                                    Upload File SKU
+                                    Upload SKU file
                                 </TabsTrigger>
                                 <TabsTrigger value="paste">
-                                    Paste Daftar Link
+                                    Paste links
                                 </TabsTrigger>
                             </TabsList>
                             <TabsContent value="upload">
                                 <FileUploadZone
                                     title="Upload SKU File"
-                                    description="File teks/TSV dengan nama katalog dan link Google Drive"
+                                    description="Text/TSV file containing catalog names and Google Drive links"
                                     accept=".txt,.tsv,.csv"
                                     onUpload={handleSkuUpload}
                                     file={skuFile}
                                     icon="file"
-                                    subtitle="Lebih disarankan"
+                                    subtitle="Recommended"
                                 />
                             </TabsContent>
                             <TabsContent value="paste">
                                 <div className="rounded-xl border bg-card p-4 space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ClipboardPaste className="w-4 h-4" />
-                                        Tempel daftar link (satu per baris, bisa
-                                        berisi nama katalog + URL)
+                                        Paste list of links (one per line, can
+                                        include catalog name + URL)
                                     </div>
                                     <Textarea
                                         className="min-h-[180px]"
-                                        placeholder="Contoh:&#10;Nama Katalog 1    https://drive.google.com/uc?id=...&#10;Nama Katalog 2    https://drive.google.com/file/d/.../view"
+                                        placeholder="Example:&#10;Catalog Name 1    https://drive.google.com/uc?id=...&#10;Catalog Name 2    https://drive.google.com/file/d/.../view"
                                         value={skuText}
                                         onChange={(e) =>
                                             setSkuText(e.target.value)
@@ -460,8 +460,8 @@ export function SkuProcessor() {
                                                 <Spinner className="mr-2" />
                                             )}
                                             {parsingPaste
-                                                ? "Memproses..."
-                                                : "Parse teks"}
+                                                ? "Processing..."
+                                                : "Parse text"}
                                         </Button>
                                     </div>
                                 </div>
@@ -469,7 +469,7 @@ export function SkuProcessor() {
                         </Tabs>
                         <FileUploadZone
                             title="Upload Frame"
-                            description="PNG image untuk overlay semua gambar"
+                            description="PNG image to overlay all downloaded images"
                             accept="image/png"
                             onUpload={handleFrameUpload}
                             file={frameFile}
