@@ -47,12 +47,12 @@ export function LoginForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="border-stone-200 bg-stone-50/90">
+            <Card className="border-border bg-card">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-xl text-stone-900">
+                    <CardTitle className="text-xl text-foreground">
                         Welcome back
                     </CardTitle>
-                    <CardDescription className="text-stone-600">
+                    <CardDescription className="text-muted-foreground">
                         Use your Stampsu account to access Stampify
                     </CardDescription>
                 </CardHeader>
@@ -60,7 +60,7 @@ export function LoginForm({
                     <form className="space-y-4" onSubmit={onSubmit}>
                         <div className="space-y-2">
                             <Label
-                                className="text-sm text-stone-800"
+                                className="text-sm text-foreground"
                                 htmlFor="username"
                             >
                                 Username
@@ -68,7 +68,7 @@ export function LoginForm({
                             <Input
                                 id="username"
                                 name="username"
-                                className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-stone-400"
+                                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -77,7 +77,7 @@ export function LoginForm({
                         </div>
                         <div className="space-y-2">
                             <Label
-                                className="text-sm text-stone-800"
+                                className="text-sm text-foreground"
                                 htmlFor="password"
                             >
                                 Password
@@ -86,7 +86,7 @@ export function LoginForm({
                                 id="password"
                                 name="password"
                                 type="password"
-                                className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-stone-400"
+                                className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -96,7 +96,7 @@ export function LoginForm({
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-stone-900 text-stone-50 hover:bg-stone-800 disabled:opacity-60"
+                            className="w-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
                         >
                             {loading && <Spinner className="mr-2" />}
                             {loading ? "Signing in..." : "Sign in"}
@@ -109,7 +109,7 @@ export function LoginForm({
                     </form>
                 </CardContent>
             </Card>
-            <p className="text-center text-sm text-stone-600 px-6">
+            <p className="text-center text-sm text-muted-foreground px-6">
                 By signing in, you agree to Stampify terms of service and
                 privacy policy.
             </p>
