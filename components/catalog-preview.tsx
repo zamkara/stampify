@@ -13,7 +13,7 @@ export function CatalogPreview({ catalogs }: CatalogPreviewProps) {
                     <thead className="bg-linear-to-b from-muted via-muted to-muted/0 sticky top-0">
                         <tr>
                             <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                                Catalog Name
+                                Folder Path
                             </th>
                             <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">
                                 Images
@@ -32,7 +32,7 @@ export function CatalogPreview({ catalogs }: CatalogPreviewProps) {
                                             <FolderIcon className="w-4 h-4 text-muted-foreground" />
                                         </div>
                                         <span className="text-sm text-foreground truncate">
-                                            {catalog.name}
+                                            {catalog.path}
                                         </span>
                                     </div>
                                 </td>
@@ -40,7 +40,7 @@ export function CatalogPreview({ catalogs }: CatalogPreviewProps) {
                                     <div className="flex items-center justify-end gap-2">
                                         <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
                                         <span className="text-sm text-muted-foreground">
-                                            {catalog.urls.length} file(s)
+                                            {catalog.files.length} file(s)
                                         </span>
                                     </div>
                                 </td>

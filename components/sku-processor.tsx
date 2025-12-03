@@ -42,12 +42,12 @@ export function SkuProcessor() {
         total: 0,
         message: "",
     });
-    const [processedImages, setProcessedImages] = useState<
-        { catalog: string; images: string[] }[]
+    const [processedFiles, setProcessedFiles] = useState<
+        { path: string; files: { filename: string; data: string }[] }[]
     >([]);
     const [error, setError] = useState<string | null>(null);
     const [failedDownloads, setFailedDownloads] = useState<
-        { catalog: string; url: string }[]
+        { path: string; url: string; filename: string }[]
     >([]);
     const [parsingPaste, setParsingPaste] = useState(false);
 
@@ -196,32 +196,35 @@ export function SkuProcessor() {
         if (catalogs.length === 0) return;
 
         setProcessingState("downloading");
-        setProcessedImages([]);
+        setProcessedFiles([]);
         setFailedDownloads([]);
         setError(null);
 
         const totalUrls = catalogs.reduce(
-            (acc, cat) => acc + cat.urls.length,
+            (acc, cat) => acc + cat.files.length,
             0,
         );
         let processedCount = 0;
-        const failed: { catalog: string; url: string }[] = [];
+        const failed: { path: string; url: string; filename: string }[] = [];
 
         try {
-            const results: { catalog: string; images: string[] }[] = [];
+            const results: {
+                path: string;
+                files: { filename: string; data: string }[];
+            }[] = [];
 
             for (const catalog of catalogs) {
-                const catalogImages: string[] = [];
+                const catalogFiles: { filename: string; data: string }[] = [];
 
-                for (const url of catalog.urls) {
+                for (const file of catalog.files) {
                     processedCount++;
                     setProgress({
                         current: processedCount,
                         total: totalUrls,
-                        message: `Downloading: ${catalog.name} (${processedCount}/${totalUrls})`,
+                        message: `Downloading: ${catalog.path} (${processedCount}/${totalUrls})`,
                     });
 
-                    const imageData = await downloadImage(url);
+                    const imageData = await downloadImage(file.url);
 
                     if (imageData) {
                         if (frameImage) {
@@ -229,34 +232,44 @@ export function SkuProcessor() {
                             setProgress({
                                 current: processedCount,
                                 total: totalUrls,
-                                message: `Applying frame: ${catalog.name}`,
+                                message: `Applying frame: ${catalog.path}`,
                             });
                             const processed =
                                 await applyFrameWithCanvas(imageData);
-                            catalogImages.push(processed);
+                            catalogFiles.push({
+                                filename: file.filename,
+                                data: processed,
+                            });
                             setProcessingState("downloading");
                         } else {
-                            catalogImages.push(imageData);
+                            catalogFiles.push({
+                                filename: file.filename,
+                                data: imageData,
+                            });
                         }
                     } else {
-                        failed.push({ catalog: catalog.name, url });
+                        failed.push({
+                            path: catalog.path,
+                            url: file.url,
+                            filename: file.filename,
+                        });
                     }
                 }
 
-                if (catalogImages.length > 0) {
+                if (catalogFiles.length > 0) {
                     results.push({
-                        catalog: catalog.name,
-                        images: catalogImages,
+                        path: catalog.path,
+                        files: catalogFiles,
                     });
                 }
             }
 
-            setProcessedImages(results);
+            setProcessedFiles(results);
             setFailedDownloads(failed);
             setProcessingState("complete");
 
             const successCount = results.reduce(
-                (acc, cat) => acc + cat.images.length,
+                (acc, cat) => acc + cat.files.length,
                 0,
             );
             if (successCount === 0) {
@@ -283,15 +296,16 @@ export function SkuProcessor() {
 
         const totalRetries = failedDownloads.length;
         let retryCount = 0;
-        const stillFailed: { catalog: string; url: string }[] = [];
-        const newResults = [...processedImages];
+        const stillFailed: { path: string; url: string; filename: string }[] =
+            [];
+        const newResults = [...processedFiles];
 
-        for (const { catalog, url } of failedDownloads) {
+        for (const { path, url, filename } of failedDownloads) {
             retryCount++;
             setProgress({
                 current: retryCount,
                 total: totalRetries,
-                message: `Retrying: ${catalog} (${retryCount}/${totalRetries})`,
+                message: `Retrying: ${path} (${retryCount}/${totalRetries})`,
             });
 
             const imageData = await downloadImage(url);
@@ -300,20 +314,24 @@ export function SkuProcessor() {
                 const processed = frameImage
                     ? await applyFrameWithCanvas(imageData)
                     : imageData;
-                const existingCatalog = newResults.find(
-                    (r) => r.catalog === catalog,
-                );
+                const existingCatalog = newResults.find((r) => r.path === path);
                 if (existingCatalog) {
-                    existingCatalog.images.push(processed);
+                    existingCatalog.files.push({
+                        filename,
+                        data: processed,
+                    });
                 } else {
-                    newResults.push({ catalog, images: [processed] });
+                    newResults.push({
+                        path,
+                        files: [{ filename, data: processed }],
+                    });
                 }
             } else {
-                stillFailed.push({ catalog, url });
+                stillFailed.push({ path, url, filename });
             }
         }
 
-        setProcessedImages(newResults);
+        setProcessedFiles(newResults);
         setFailedDownloads(stillFailed);
         setProcessingState("complete");
 
@@ -327,18 +345,19 @@ export function SkuProcessor() {
     };
 
     const handleDownloadZip = async () => {
-        if (!processedImages.length) return;
+        if (!processedFiles.length) return;
         setProcessingState("zipping");
         setProgress({ current: 0, total: 100, message: "Creating ZIP..." });
 
         try {
             const zip = new JSZip();
 
-            for (const cat of processedImages) {
-                const folder = zip.folder(cat.catalog)!;
-                cat.images.forEach((img, idx) => {
-                    const base64 = img.split(",")[1] || "";
-                    folder.file(`${cat.catalog}-${idx + 1}.png`, base64, {
+            for (const cat of processedFiles) {
+                const folderPath = cat.path || "katalog";
+                const folder = zip.folder(folderPath)!;
+                cat.files.forEach((file) => {
+                    const base64 = file.data.split(",")[1] || "";
+                    folder.file(file.filename, base64, {
                         base64: true,
                     });
                 });
@@ -373,12 +392,14 @@ export function SkuProcessor() {
 
     const handleDownloadSingle = (
         imageData: string,
-        catalogName: string,
-        index: number,
+        path: string,
+        filename: string,
     ) => {
         const a = document.createElement("a");
         a.href = imageData;
-        a.download = `${catalogName}-${index + 1}.png`;
+        a.download = path
+            ? `${path.replace(/\//g, "-")}-${filename}`
+            : filename;
         a.click();
     };
 
@@ -389,12 +410,12 @@ export function SkuProcessor() {
         setCatalogs([]);
         setProcessingState("idle");
         setProgress({ current: 0, total: 0, message: "" });
-        setProcessedImages([]);
+        setProcessedFiles([]);
         setFailedDownloads([]);
         setError(null);
     };
 
-    const totalUrls = catalogs.reduce((acc, cat) => acc + cat.urls.length, 0);
+    const totalUrls = catalogs.reduce((acc, cat) => acc + cat.files.length, 0);
     const canProcess = catalogs.length > 0 && processingState === "idle";
     const isProcessing =
         processingState === "downloading" ||
@@ -402,10 +423,10 @@ export function SkuProcessor() {
         processingState === "zipping";
     const isComplete = processingState === "complete";
     const hasImages =
-        processedImages.length > 0 &&
-        processedImages.some((cat) => cat.images.length > 0);
-    const totalProcessed = processedImages.reduce(
-        (acc, cat) => acc + cat.images.length,
+        processedFiles.length > 0 &&
+        processedFiles.some((cat) => cat.files.length > 0);
+    const totalProcessed = processedFiles.reduce(
+        (acc, cat) => acc + cat.files.length,
         0,
     );
 
@@ -428,7 +449,7 @@ export function SkuProcessor() {
                             <TabsContent value="upload">
                                 <FileUploadZone
                                     title="Upload SKU File"
-                                    description="Text/TSV file containing catalog names and Google Drive links"
+                                    description="Text/TSV file containing folder paths with Google Drive or direct image links"
                                     accept=".txt,.tsv,.csv"
                                     className="-mb-4"
                                     onUpload={handleSkuUpload}
@@ -445,7 +466,7 @@ export function SkuProcessor() {
                                     </div>
                                     <Textarea
                                         className="min-h-[180px]"
-                                        placeholder="Example:&#10;Catalog Name 1    https://drive.google.com/uc?id=...&#10;Catalog Name 2    https://drive.google.com/file/d/.../view"
+                                        placeholder="Example:&#10;katalog/katalog-produk-1/raw    https://drive.google.com/file/d/.../view&#10;katalog/katalog-produk-2/final/image-1.png    https://cdn.domain.com/path/to/file.png"
                                         value={skuText}
                                         onChange={(e) =>
                                             setSkuText(e.target.value)
@@ -567,34 +588,34 @@ export function SkuProcessor() {
 
                             {hasImages && (
                                 <div className="space-y-6 mt-4">
-                                    {processedImages.map((cat, idx) => (
+                                    {processedFiles.map((cat, idx) => (
                                         <div
-                                            key={`${cat.catalog}-${idx}`}
+                                            key={`${cat.path}-${idx}`}
                                             className="space-y-3"
                                         >
                                             <h3 className="text-sm font-medium text-muted-foreground">
-                                                {cat.catalog} (
-                                                {cat.images.length} images)
+                                                {cat.path} ({cat.files.length}{" "}
+                                                files)
                                             </h3>
                                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                                {cat.images.map((img, idx) => (
+                                                {cat.files.map((file, idx) => (
                                                     <div
-                                                        key={`${cat.catalog}-${idx}`}
+                                                        key={`${cat.path}-${idx}`}
                                                         className="group relative aspect-square rounded-lg overflow-hidden bg-muted border border-border cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                                                         onClick={() =>
                                                             handleDownloadSingle(
-                                                                img,
-                                                                cat.catalog,
-                                                                idx,
+                                                                file.data,
+                                                                cat.path,
+                                                                file.filename,
                                                             )
                                                         }
                                                     >
                                                         <img
                                                             src={
-                                                                img ||
+                                                                file.data ||
                                                                 "/placeholder.svg"
                                                             }
-                                                            alt={`${cat.catalog} ${idx + 1}`}
+                                                            alt={`${cat.path} ${file.filename}`}
                                                             className="w-full h-full object-cover"
                                                         />
                                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -612,9 +633,10 @@ export function SkuProcessor() {
                                 <div className="text-center py-8 text-muted-foreground">
                                     <p>No images could be downloaded.</p>
                                     <p className="text-sm mt-2">
-                                        Make sure the Google Drive files are
-                                        shared with "Anyone with the link"
-                                        permission.
+                                        Make sure Google Drive files are shared
+                                        with "Anyone with the link" permission
+                                        and direct links are accessible without
+                                        authentication.
                                     </p>
                                 </div>
                             )}
