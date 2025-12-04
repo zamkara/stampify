@@ -31,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 
+type DownloadedImage = { data: string; filename?: string };
+
 const getBase64Size = (dataUrl: string) => {
     const base64 = dataUrl.split(",")[1] || "";
     const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
@@ -46,12 +48,6 @@ const formatBytes = (bytes: number) => {
     );
     const value = bytes / 1024 ** i;
     return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-};
-
-const getNumberedFilename = (index: number, original: string) => {
-    const ext = "png";
-    const number = String(index).padStart(2, "0");
-    return `${number}.${ext}`;
 };
 
 export type ProcessingState =
@@ -259,7 +255,9 @@ export function SkuProcessor() {
         reader.readAsDataURL(file);
     }, []);
 
-    const downloadImage = async (url: string): Promise<string | null> => {
+    const downloadImage = async (
+        url: string,
+    ): Promise<DownloadedImage[] | null> => {
         try {
             const response = await fetch("/api/download", {
                 method: "POST",
@@ -269,8 +267,25 @@ export function SkuProcessor() {
 
             if (response.ok) {
                 const data = await response.json();
+                if (Array.isArray(data.images)) {
+                    return data.images
+                        .map((img: any) => {
+                            const base =
+                                typeof img?.data === "string" ? img.data : null;
+                            const filename =
+                                typeof img?.filename === "string"
+                                    ? img.filename
+                                    : undefined;
+                            return base ? { data: base, filename } : null;
+                        })
+                        .filter(
+                            (
+                                img: DownloadedImage | null,
+                            ): img is DownloadedImage => Boolean(img),
+                        );
+                }
                 if (data.imageData) {
-                    return data.imageData;
+                    return [{ data: data.imageData }];
                 }
             }
             return null;
@@ -375,6 +390,7 @@ export function SkuProcessor() {
             0,
         );
         let processedCount = 0;
+        let totalExpected = totalUrls;
         const failed: { path: string; url: string; filename: string }[] = [];
         let cancelled = false;
 
@@ -385,7 +401,6 @@ export function SkuProcessor() {
             }[] = [];
 
             for (const catalog of catalogs) {
-                let successCount = 0;
                 if (cancelRequestedRef.current) {
                     cancelled = true;
                     break;
@@ -399,58 +414,53 @@ export function SkuProcessor() {
                         break;
                     }
 
-                    processedCount++;
-                    setProgress({
-                        current: processedCount,
-                        total: totalUrls,
-                        message: `Downloading: ${catalog.path} (${processedCount}/${totalUrls})`,
-                    });
+                    const images = await downloadImage(file.url);
 
-                    const imageData = await downloadImage(file.url);
-
-                    if (imageData) {
-                        if (cancelRequestedRef.current) {
-                            cancelled = true;
-                            break;
+                    if (images && images.length > 0) {
+                        if (images.length > 1) {
+                            totalExpected += images.length - 1;
                         }
 
-                        if (frameImage) {
-                            setProcessingState("processing");
-                            setProgress({
-                                current: processedCount,
-                                total: totalUrls,
-                                message: `Applying frame: ${catalog.path}`,
-                            });
-                            const processed =
-                                await applyFrameWithCanvas(imageData);
+                        for (const img of images) {
                             if (cancelRequestedRef.current) {
                                 cancelled = true;
                                 break;
                             }
-                            successCount += 1;
+
+                            processedCount++;
+                            setProgress({
+                                current: processedCount,
+                                total: totalExpected,
+                                message: `Downloading: ${catalog.path} (${processedCount}/${totalExpected})`,
+                            });
+
+                            if (frameImage) {
+                                setProcessingState("processing");
+                                setProgress({
+                                    current: processedCount,
+                                    total: totalExpected,
+                                    message: `Applying frame: ${catalog.path}`,
+                                });
+                            }
+
+                            const processed = frameImage
+                                ? await applyFrameWithCanvas(img.data)
+                                : img.data;
+
+                            if (cancelRequestedRef.current) {
+                                cancelled = true;
+                                break;
+                            }
+
+                            const finalName = img.filename || file.filename;
                             catalogFiles.push({
-                                filename: getNumberedFilename(
-                                    successCount,
-                                    file.filename,
-                                ),
+                                filename: finalName,
                                 data: processed,
                             });
                             playSound(downloadSoundRef);
-                            setProcessingState("downloading");
-                        } else {
-                            if (cancelRequestedRef.current) {
-                                cancelled = true;
-                                break;
+                            if (frameImage) {
+                                setProcessingState("downloading");
                             }
-                            successCount += 1;
-                            catalogFiles.push({
-                                filename: getNumberedFilename(
-                                    successCount,
-                                    file.filename,
-                                ),
-                                data: imageData,
-                            });
-                            playSound(downloadSoundRef);
                         }
                     } else {
                         failed.push({
@@ -492,11 +502,11 @@ export function SkuProcessor() {
             );
             if (successCount === 0) {
                 setError(
-                    `All ${totalUrls} downloads failed. This usually means the files require Google account access or are not publicly shared with "Anyone with the link".`,
+                    `All ${totalExpected} downloads failed. This usually means the files require Google account access or are not publicly shared with "Anyone with the link".`,
                 );
             } else if (failed.length > 0) {
                 setError(
-                    `${failed.length} of ${totalUrls} files failed to download.`,
+                    `${failed.length} of ${totalExpected} files failed to download.`,
                 );
             }
         } catch (err) {
@@ -516,12 +526,12 @@ export function SkuProcessor() {
         setPreviewIndex(null);
         setPreviewMeta(null);
 
-        const totalRetries = failedDownloads.length;
         let retryCount = 0;
         const stillFailed: { path: string; url: string; filename: string }[] =
             [];
         const newResults = [...processedFiles];
         let cancelled = false;
+        let totalExpected = failedDownloads.length;
 
         for (const { path, url, filename } of failedDownloads) {
             if (cancelRequestedRef.current) {
@@ -529,46 +539,69 @@ export function SkuProcessor() {
                 break;
             }
 
-            retryCount++;
-            setProgress({
-                current: retryCount,
-                total: totalRetries,
-                message: `Retrying: ${path} (${retryCount}/${totalRetries})`,
-            });
+            const images = await downloadImage(url);
 
-            const imageData = await downloadImage(url);
+            if (images && images.length > 1) {
+                totalExpected += images.length - 1;
+            }
 
-            if (imageData) {
-                if (cancelRequestedRef.current) {
-                    cancelled = true;
-                    break;
-                }
-
-                const processed = frameImage
-                    ? await applyFrameWithCanvas(imageData)
-                    : imageData;
-                if (cancelRequestedRef.current) {
-                    cancelled = true;
-                    break;
-                }
-                const existingCatalog = newResults.find((r) => r.path === path);
-                const nextIndex = existingCatalog
-                    ? existingCatalog.files.length + 1
-                    : 1;
-                const numbered = getNumberedFilename(nextIndex, filename);
-                if (existingCatalog) {
-                    existingCatalog.files.push({
-                        filename: numbered,
-                        data: processed,
+            if (images && images.length) {
+                for (const img of images) {
+                    retryCount++;
+                    setProgress({
+                        current: retryCount,
+                        total: totalExpected,
+                        message: `Retrying: ${path} (${retryCount}/${totalExpected})`,
                     });
-                } else {
-                    newResults.push({
-                        path,
-                        files: [{ filename: numbered, data: processed }],
-                    });
+
+                    if (cancelRequestedRef.current) {
+                        cancelled = true;
+                        break;
+                    }
+
+                    if (frameImage) {
+                        setProcessingState("processing");
+                        setProgress({
+                            current: retryCount,
+                            total: totalExpected,
+                            message: `Applying frame: ${path}`,
+                        });
+                    }
+
+                    const processed = frameImage
+                        ? await applyFrameWithCanvas(img.data)
+                        : img.data;
+                    if (cancelRequestedRef.current) {
+                        cancelled = true;
+                        break;
+                    }
+                    const existingCatalog = newResults.find(
+                        (r) => r.path === path,
+                    );
+                    const finalName = img.filename || filename;
+                    if (existingCatalog) {
+                        existingCatalog.files.push({
+                            filename: finalName,
+                            data: processed,
+                        });
+                    } else {
+                        newResults.push({
+                            path,
+                            files: [{ filename: finalName, data: processed }],
+                        });
+                    }
+                    playSound(downloadSoundRef);
+                    if (frameImage) {
+                        setProcessingState("downloading");
+                    }
                 }
-                playSound(downloadSoundRef);
             } else {
+                retryCount++;
+                setProgress({
+                    current: retryCount,
+                    total: totalExpected,
+                    message: `Retrying: ${path} (${retryCount}/${totalExpected})`,
+                });
                 stillFailed.push({ path, url, filename });
             }
         }

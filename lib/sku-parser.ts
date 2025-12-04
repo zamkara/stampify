@@ -1,5 +1,6 @@
 const DEFAULT_ROOT = "katalog";
 const URL_REGEX = /(https?:\/\/[^\s]+)/i;
+const PARENTHETICAL_REGEX = /\(([^()]+)\)\s*$/;
 
 export interface CatalogFile {
     url: string;
@@ -58,6 +59,7 @@ export function parseSKUFile(content: string): Catalog[] {
             columns.find((col) => col !== url) ||
             line.replace(url, "").trim() ||
             currentFolder;
+        const parentheticalName = extractParentheticalName(line, url);
         const { folderPath, explicitFilename } = splitPath(
             pathHint || DEFAULT_ROOT,
         );
@@ -65,9 +67,12 @@ export function parseSKUFile(content: string): Catalog[] {
 
         const catalog = ensureCatalog(folderPath, catalogs);
         const count = counters.get(folderPath) ?? 0;
+        const inferredExtension = guessExtensionFromUrl(url) || ".png";
+        const explicitFromParentheses = sanitizeFilename(parentheticalName);
         const filename =
             sanitizeFilename(explicitFilename) ||
-            `image-${count + 1}${guessExtensionFromUrl(url) || ".png"}`;
+            explicitFromParentheses ||
+            `image-${count + 1}${inferredExtension}`;
 
         counters.set(folderPath, count + 1);
         catalog.files.push({
@@ -162,4 +167,10 @@ function extractGoogleDriveId(url: string): string | null {
     if (/folders\//.test(url)) return null;
 
     return null;
+}
+
+function extractParentheticalName(line: string, url: string): string {
+    const withoutUrl = line.replace(url, "").trim();
+    const match = withoutUrl.match(PARENTHETICAL_REGEX);
+    return match?.[1]?.trim() || "";
 }
