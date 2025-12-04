@@ -112,13 +112,16 @@ export function SkuProcessor() {
             .catch(() => null);
     }, []);
 
-    const playSound = useCallback((audioRef: RefObject<HTMLAudioElement>) => {
-        const audio = audioRef.current;
-        if (audio) {
-            audio.currentTime = 0;
-            audio.play().catch(() => null);
-        }
-    }, []);
+    const playSound = useCallback(
+        (audioRef: RefObject<HTMLAudioElement | null>) => {
+            const audio = audioRef.current;
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(() => null);
+            }
+        },
+        [],
+    );
 
     useEffect(() => {
         if (
