@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import {
+    useState,
+    useCallback,
+    useEffect,
+    useRef,
+    type RefObject,
+} from "react";
 import JSZip from "jszip";
 import { FileUploadZone } from "./file-upload-zone";
 import { CatalogPreview } from "./catalog-preview";
@@ -15,6 +21,7 @@ import {
     RotateCcw,
     ClipboardPaste,
     FileText,
+    Square,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,6 +57,38 @@ export function SkuProcessor() {
         { path: string; url: string; filename: string }[]
     >([]);
     const [parsingPaste, setParsingPaste] = useState(false);
+    const downloadSoundRef = useRef<HTMLAudioElement | null>(null);
+    const completeSoundRef = useRef<HTMLAudioElement | null>(null);
+    const hasPlayedCompleteSoundRef = useRef(false);
+    const cancelRequestedRef = useRef(false);
+
+    useEffect(() => {
+        downloadSoundRef.current = new Audio(
+            "https://cdn.freesound.org/previews/256/256760_876304-lq.ogg",
+        );
+        completeSoundRef.current = new Audio(
+            "https://cdn.freesound.org/previews/51/51169_179538-lq.ogg",
+        );
+    }, []);
+
+    const playSound = useCallback((audioRef: RefObject<HTMLAudioElement>) => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => null);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (
+            processingState === "complete" &&
+            processedFiles.some((cat) => cat.files.length > 0) &&
+            !hasPlayedCompleteSoundRef.current
+        ) {
+            hasPlayedCompleteSoundRef.current = true;
+            playSound(completeSoundRef);
+        }
+    }, [processingState, processedFiles, playSound]);
 
     const handleSkuUpload = useCallback(async (file: File) => {
         setSkuFile(file);
@@ -199,6 +238,8 @@ export function SkuProcessor() {
         setProcessedFiles([]);
         setFailedDownloads([]);
         setError(null);
+        hasPlayedCompleteSoundRef.current = false;
+        cancelRequestedRef.current = false;
 
         const totalUrls = catalogs.reduce(
             (acc, cat) => acc + cat.files.length,
@@ -206,6 +247,7 @@ export function SkuProcessor() {
         );
         let processedCount = 0;
         const failed: { path: string; url: string; filename: string }[] = [];
+        let cancelled = false;
 
         try {
             const results: {
@@ -214,9 +256,19 @@ export function SkuProcessor() {
             }[] = [];
 
             for (const catalog of catalogs) {
+                if (cancelRequestedRef.current) {
+                    cancelled = true;
+                    break;
+                }
+
                 const catalogFiles: { filename: string; data: string }[] = [];
 
                 for (const file of catalog.files) {
+                    if (cancelRequestedRef.current) {
+                        cancelled = true;
+                        break;
+                    }
+
                     processedCount++;
                     setProgress({
                         current: processedCount,
@@ -227,6 +279,11 @@ export function SkuProcessor() {
                     const imageData = await downloadImage(file.url);
 
                     if (imageData) {
+                        if (cancelRequestedRef.current) {
+                            cancelled = true;
+                            break;
+                        }
+
                         if (frameImage) {
                             setProcessingState("processing");
                             setProgress({
@@ -236,16 +293,26 @@ export function SkuProcessor() {
                             });
                             const processed =
                                 await applyFrameWithCanvas(imageData);
+                            if (cancelRequestedRef.current) {
+                                cancelled = true;
+                                break;
+                            }
                             catalogFiles.push({
                                 filename: file.filename,
                                 data: processed,
                             });
+                            playSound(downloadSoundRef);
                             setProcessingState("downloading");
                         } else {
+                            if (cancelRequestedRef.current) {
+                                cancelled = true;
+                                break;
+                            }
                             catalogFiles.push({
                                 filename: file.filename,
                                 data: imageData,
                             });
+                            playSound(downloadSoundRef);
                         }
                     } else {
                         failed.push({
@@ -254,6 +321,10 @@ export function SkuProcessor() {
                             filename: file.filename,
                         });
                     }
+                }
+
+                if (cancelled) {
+                    break;
                 }
 
                 if (catalogFiles.length > 0) {
@@ -266,6 +337,15 @@ export function SkuProcessor() {
 
             setProcessedFiles(results);
             setFailedDownloads(failed);
+            if (cancelled) {
+                setProcessingState("idle");
+                setProgress({
+                    current: 0,
+                    total: 0,
+                    message: "Process cancelled",
+                });
+                return;
+            }
             setProcessingState("complete");
 
             const successCount = results.reduce(
@@ -293,14 +373,22 @@ export function SkuProcessor() {
 
         setProcessingState("downloading");
         setError(null);
+        hasPlayedCompleteSoundRef.current = false;
+        cancelRequestedRef.current = false;
 
         const totalRetries = failedDownloads.length;
         let retryCount = 0;
         const stillFailed: { path: string; url: string; filename: string }[] =
             [];
         const newResults = [...processedFiles];
+        let cancelled = false;
 
         for (const { path, url, filename } of failedDownloads) {
+            if (cancelRequestedRef.current) {
+                cancelled = true;
+                break;
+            }
+
             retryCount++;
             setProgress({
                 current: retryCount,
@@ -311,9 +399,18 @@ export function SkuProcessor() {
             const imageData = await downloadImage(url);
 
             if (imageData) {
+                if (cancelRequestedRef.current) {
+                    cancelled = true;
+                    break;
+                }
+
                 const processed = frameImage
                     ? await applyFrameWithCanvas(imageData)
                     : imageData;
+                if (cancelRequestedRef.current) {
+                    cancelled = true;
+                    break;
+                }
                 const existingCatalog = newResults.find((r) => r.path === path);
                 if (existingCatalog) {
                     existingCatalog.files.push({
@@ -326,9 +423,20 @@ export function SkuProcessor() {
                         files: [{ filename, data: processed }],
                     });
                 }
+                playSound(downloadSoundRef);
             } else {
                 stillFailed.push({ path, url, filename });
             }
+        }
+
+        if (cancelled) {
+            setProcessingState("idle");
+            setProgress({
+                current: 0,
+                total: 0,
+                message: "Process cancelled",
+            });
+            return;
         }
 
         setProcessedFiles(newResults);
@@ -390,6 +498,14 @@ export function SkuProcessor() {
         }
     };
 
+    const handleStopProcess = () => {
+        cancelRequestedRef.current = true;
+        setProgress((prev) => ({
+            ...prev,
+            message: "Stopping process...",
+        }));
+    };
+
     const handleDownloadSingle = (
         imageData: string,
         path: string,
@@ -413,6 +529,7 @@ export function SkuProcessor() {
         setProcessedFiles([]);
         setFailedDownloads([]);
         setError(null);
+        cancelRequestedRef.current = false;
     };
 
     const totalUrls = catalogs.reduce((acc, cat) => acc + cat.files.length, 0);
@@ -526,12 +643,20 @@ export function SkuProcessor() {
                                         Reset
                                     </OrangeButton>
                                     <OrangeButton
-                                        onClick={handleProcess}
-                                        disabled={!canProcess || isProcessing}
+                                        onClick={
+                                            isProcessing
+                                                ? handleStopProcess
+                                                : handleProcess
+                                        }
+                                        disabled={!canProcess && !isProcessing}
                                     >
-                                        <Play className="w-4 h-4 mr-2" />
+                                        {isProcessing ? (
+                                            <Square className="w-4 h-4 mr-2" />
+                                        ) : (
+                                            <Play className="w-4 h-4 mr-2" />
+                                        )}
                                         {isProcessing
-                                            ? "Processing..."
+                                            ? "Stop Process"
                                             : "Process Images"}
                                     </OrangeButton>
                                 </div>
