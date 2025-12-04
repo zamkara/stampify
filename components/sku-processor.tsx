@@ -90,6 +90,7 @@ export function SkuProcessor() {
         height?: number;
         sizeLabel?: string;
     } | null>(null);
+    const [username, setUsername] = useState<string | null>(null);
     const downloadSoundRef = useRef<HTMLAudioElement | null>(null);
     const completeSoundRef = useRef<HTMLAudioElement | null>(null);
     const hasPlayedCompleteSoundRef = useRef(false);
@@ -102,6 +103,17 @@ export function SkuProcessor() {
         completeSoundRef.current = new Audio(
             "https://cdn.freesound.org/previews/51/51169_179538-lq.ogg",
         );
+    }, []);
+
+    useEffect(() => {
+        fetch("/api/auth/me")
+            .then((res) => (res.ok ? res.json() : null))
+            .then((body) => {
+                if (body?.success && body.data?.username) {
+                    setUsername(body.data.username);
+                }
+            })
+            .catch(() => null);
     }, []);
 
     const playSound = useCallback((audioRef: RefObject<HTMLAudioElement>) => {
@@ -584,6 +596,19 @@ export function SkuProcessor() {
         }
     };
 
+    const buildZipFilename = useCallback(() => {
+        const now = new Date();
+        const pad = (value: number, length = 2) =>
+            String(value).padStart(length, "0");
+        const timestamp = `${pad(now.getDate())}${pad(
+            now.getMonth() + 1,
+        )}${now.getFullYear()}${pad(now.getHours())}${pad(
+            now.getMinutes(),
+        )}${pad(now.getSeconds())}${pad(now.getMilliseconds(), 3)}`;
+        const user = username?.trim() || "user";
+        return `${user}-${timestamp}.zip`;
+    }, [username]);
+
     const handleDownloadZip = async () => {
         if (!processedFiles.length) return;
         setProcessingState("zipping");
@@ -617,7 +642,7 @@ export function SkuProcessor() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "catalogs.zip";
+            a.download = buildZipFilename();
             a.click();
             URL.revokeObjectURL(url);
 
