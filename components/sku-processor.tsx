@@ -6,6 +6,7 @@ import {
     useEffect,
     useRef,
     type RefObject,
+    useMemo,
 } from "react";
 import JSZip from "jszip";
 import { FileUploadZone } from "./file-upload-zone";
@@ -20,12 +21,38 @@ import {
     Trash2,
     RotateCcw,
     ClipboardPaste,
-    FileText,
     Square,
+    X,
+    Eye,
+    ArrowLeft,
+    ArrowRight,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
+
+const getBase64Size = (dataUrl: string) => {
+    const base64 = dataUrl.split(",")[1] || "";
+    const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+    return Math.max(0, base64.length * 0.75 - padding);
+};
+
+const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.min(
+        units.length - 1,
+        Math.floor(Math.log(bytes) / Math.log(1024)),
+    );
+    const value = bytes / 1024 ** i;
+    return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+};
+
+const getNumberedFilename = (index: number, original: string) => {
+    const ext = "png";
+    const number = String(index).padStart(2, "0");
+    return `${number}.${ext}`;
+};
 
 export type ProcessingState =
     | "idle"
@@ -57,6 +84,12 @@ export function SkuProcessor() {
         { path: string; url: string; filename: string }[]
     >([]);
     const [parsingPaste, setParsingPaste] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+    const [previewMeta, setPreviewMeta] = useState<{
+        width?: number;
+        height?: number;
+        sizeLabel?: string;
+    } | null>(null);
     const downloadSoundRef = useRef<HTMLAudioElement | null>(null);
     const completeSoundRef = useRef<HTMLAudioElement | null>(null);
     const hasPlayedCompleteSoundRef = useRef(false);
@@ -89,6 +122,88 @@ export function SkuProcessor() {
             playSound(completeSoundRef);
         }
     }, [processingState, processedFiles, playSound]);
+
+    const flattenedImages = useMemo(
+        () =>
+            processedFiles.flatMap((cat) =>
+                cat.files.map((file) => ({
+                    ...file,
+                    path: cat.path,
+                })),
+            ),
+        [processedFiles],
+    );
+
+    useEffect(() => {
+        if (previewIndex !== null && previewIndex >= flattenedImages.length) {
+            setPreviewIndex(flattenedImages.length ? 0 : null);
+        }
+    }, [previewIndex, flattenedImages.length]);
+
+    useEffect(() => {
+        if (previewIndex === null) {
+            setPreviewMeta(null);
+            return;
+        }
+        const current = flattenedImages[previewIndex];
+        if (!current) {
+            setPreviewMeta(null);
+            return;
+        }
+        const sizeBytes = getBase64Size(current.data);
+        setPreviewMeta({ sizeLabel: formatBytes(sizeBytes) });
+
+        const img = new Image();
+        img.onload = () =>
+            setPreviewMeta((prev) => ({
+                ...prev,
+                width: img.width,
+                height: img.height,
+            }));
+        img.src = current.data;
+
+        return () => {
+            img.onload = null;
+        };
+    }, [previewIndex, flattenedImages]);
+
+    const navigatePreview = useCallback(
+        (direction: 1 | -1) => {
+            setPreviewIndex((current) => {
+                if (current === null || flattenedImages.length === 0) {
+                    return current;
+                }
+                const next =
+                    (current + direction + flattenedImages.length) %
+                    flattenedImages.length;
+                return next;
+            });
+        },
+        [flattenedImages.length],
+    );
+
+    const closePreview = useCallback(() => {
+        setPreviewIndex(null);
+        setPreviewMeta(null);
+    }, []);
+
+    useEffect(() => {
+        if (previewIndex === null) return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "ArrowRight") {
+                e.preventDefault();
+                navigatePreview(1);
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                navigatePreview(-1);
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                closePreview();
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [previewIndex, navigatePreview, closePreview]);
 
     const handleSkuUpload = useCallback(async (file: File) => {
         setSkuFile(file);
@@ -240,6 +355,8 @@ export function SkuProcessor() {
         setError(null);
         hasPlayedCompleteSoundRef.current = false;
         cancelRequestedRef.current = false;
+        setPreviewIndex(null);
+        setPreviewMeta(null);
 
         const totalUrls = catalogs.reduce(
             (acc, cat) => acc + cat.files.length,
@@ -256,6 +373,7 @@ export function SkuProcessor() {
             }[] = [];
 
             for (const catalog of catalogs) {
+                let successCount = 0;
                 if (cancelRequestedRef.current) {
                     cancelled = true;
                     break;
@@ -297,8 +415,12 @@ export function SkuProcessor() {
                                 cancelled = true;
                                 break;
                             }
+                            successCount += 1;
                             catalogFiles.push({
-                                filename: file.filename,
+                                filename: getNumberedFilename(
+                                    successCount,
+                                    file.filename,
+                                ),
                                 data: processed,
                             });
                             playSound(downloadSoundRef);
@@ -308,8 +430,12 @@ export function SkuProcessor() {
                                 cancelled = true;
                                 break;
                             }
+                            successCount += 1;
                             catalogFiles.push({
-                                filename: file.filename,
+                                filename: getNumberedFilename(
+                                    successCount,
+                                    file.filename,
+                                ),
                                 data: imageData,
                             });
                             playSound(downloadSoundRef);
@@ -375,6 +501,8 @@ export function SkuProcessor() {
         setError(null);
         hasPlayedCompleteSoundRef.current = false;
         cancelRequestedRef.current = false;
+        setPreviewIndex(null);
+        setPreviewMeta(null);
 
         const totalRetries = failedDownloads.length;
         let retryCount = 0;
@@ -412,15 +540,19 @@ export function SkuProcessor() {
                     break;
                 }
                 const existingCatalog = newResults.find((r) => r.path === path);
+                const nextIndex = existingCatalog
+                    ? existingCatalog.files.length + 1
+                    : 1;
+                const numbered = getNumberedFilename(nextIndex, filename);
                 if (existingCatalog) {
                     existingCatalog.files.push({
-                        filename,
+                        filename: numbered,
                         data: processed,
                     });
                 } else {
                     newResults.push({
                         path,
-                        files: [{ filename, data: processed }],
+                        files: [{ filename: numbered, data: processed }],
                     });
                 }
                 playSound(downloadSoundRef);
@@ -506,6 +638,15 @@ export function SkuProcessor() {
         }));
     };
 
+    const openPreview = (path: string, filename: string) => {
+        const idx = flattenedImages.findIndex(
+            (item) => item.path === path && item.filename === filename,
+        );
+        if (idx !== -1) {
+            setPreviewIndex(idx);
+        }
+    };
+
     const handleDownloadSingle = (
         imageData: string,
         path: string,
@@ -530,6 +671,8 @@ export function SkuProcessor() {
         setFailedDownloads([]);
         setError(null);
         cancelRequestedRef.current = false;
+        setPreviewIndex(null);
+        setPreviewMeta(null);
     };
 
     const totalUrls = catalogs.reduce((acc, cat) => acc + cat.files.length, 0);
@@ -546,6 +689,8 @@ export function SkuProcessor() {
         (acc, cat) => acc + cat.files.length,
         0,
     );
+    const currentPreview =
+        previewIndex !== null ? flattenedImages[previewIndex] : null;
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -674,7 +819,7 @@ export function SkuProcessor() {
                     )}
 
                     {isComplete && (
-                        <section className="space-y-4 p-6 bg-card border border-border rounded-lg">
+                        <section className="space-y-4 p-6 bg-card border border-border rounded-xl">
                             <div className="flex items-center justify-between flex-wrap gap-4">
                                 <div>
                                     <h2 className="text-lg font-semibold text-foreground">
@@ -728,8 +873,7 @@ export function SkuProcessor() {
                                                         key={`${cat.path}-${idx}`}
                                                         className="group relative aspect-square rounded-lg overflow-hidden bg-muted border border-border cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                                                         onClick={() =>
-                                                            handleDownloadSingle(
-                                                                file.data,
+                                                            openPreview(
                                                                 cat.path,
                                                                 file.filename,
                                                             )
@@ -744,7 +888,7 @@ export function SkuProcessor() {
                                                             className="w-full h-full object-cover"
                                                         />
                                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <Download className="w-6 h-6 text-white" />
+                                                            <Eye className="w-6 h-6 text-white" />
                                                         </div>
                                                     </div>
                                                 ))}
@@ -769,6 +913,100 @@ export function SkuProcessor() {
                     )}
                 </div>
             </div>
+            {currentPreview && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="relative w-full max-w-5xl bg-background border border-border rounded-xl shadow-2xl overflow-hidden">
+                        <div className="absolute top-3 right-3">
+                            <button
+                                onClick={closePreview}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                                aria-label="Close preview"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-6 p-2 pe-6">
+                            <div className="flex-1 `min-h-80 bg-muted rounded-md overflow-hidden flex items-center justify-center border border-border">
+                                <img
+                                    src={currentPreview.data}
+                                    alt={`${currentPreview.path} ${currentPreview.filename}`}
+                                    className="max-h-[70vh] max-w-full object-contain"
+                                />
+                            </div>
+                            <div className="w-full md:w-72 space-y-4 my-2 me-2">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Filename
+                                    </p>
+                                    <p className="text-sm font-medium break-all">
+                                        {currentPreview.filename}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-xs text-muted-foreground">
+                                        Path
+                                    </p>
+                                    <p className="text-sm font-medium `wrap-break-word">
+                                        {currentPreview.path || "-"}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground">
+                                            Dimensions
+                                        </p>
+                                        <p className="font-medium">
+                                            {previewMeta?.width &&
+                                            previewMeta?.height
+                                                ? `${previewMeta.width} x ${previewMeta.height}px`
+                                                : "Loading..."}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground">
+                                            Size
+                                        </p>
+                                        <p className="font-medium">
+                                            {previewMeta?.sizeLabel || "—"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <OrangeButton
+                                        onClick={() =>
+                                            handleDownloadSingle(
+                                                currentPreview.data,
+                                                currentPreview.path,
+                                                currentPreview.filename,
+                                            )
+                                        }
+                                        className="mt-8 justify-center"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download
+                                    </OrangeButton>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute bottom-4 right-4 flex gap-2">
+                            <button
+                                onClick={() => navigatePreview(-1)}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors border border-border"
+                                aria-label="Previous image"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => navigatePreview(1)}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors border border-border"
+                                aria-label="Next image"
+                            >
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

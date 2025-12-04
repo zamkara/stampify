@@ -1,105 +1,139 @@
-import type { ProcessingState } from "./sku-processor"
-import { Loader2, CheckCircle2, AlertCircle, Download, Cog, FileArchive } from "lucide-react"
-import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
+import type { ProcessingState } from "./sku-processor";
+import {
+    Loader2,
+    CheckCircle2,
+    AlertCircle,
+    Download,
+    Cog,
+    FileArchive,
+} from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 
 interface ProcessingStatusProps {
-  state: ProcessingState
-  progress: { current: number; total: number; message: string }
-  error: string | null
+    state: ProcessingState;
+    progress: { current: number; total: number; message: string };
+    error: string | null;
 }
 
-export function ProcessingStatus({ state, progress, error }: ProcessingStatusProps) {
-  const getStatusConfig = () => {
-    switch (state) {
-      case "parsing":
-        return {
-          icon: Spinner,
-          title: "Parsing SKU file...",
-          iconClass: "text-foreground",
+export function ProcessingStatus({
+    state,
+    progress,
+    error,
+}: ProcessingStatusProps) {
+    const getStatusConfig = () => {
+        switch (state) {
+            case "parsing":
+                return {
+                    icon: Spinner,
+                    title: "Parsing SKU file...",
+                    iconClass: "text-foreground",
+                };
+            case "downloading":
+                return {
+                    icon: Spinner,
+                    title: "Downloading images...",
+                    iconClass: "text-foreground",
+                };
+            case "processing":
+                return {
+                    icon: Spinner,
+                    title: "Applying frame overlay...",
+                    iconClass: "text-foreground",
+                };
+            case "zipping":
+                return {
+                    icon: Spinner,
+                    title: "Creating ZIP...",
+                    iconClass: "text-foreground",
+                };
+            case "complete":
+                return {
+                    icon: CheckCircle2,
+                    title: "Processing complete!",
+                    iconClass: "text-green-500",
+                };
+            case "error":
+                return {
+                    icon: AlertCircle,
+                    title: "Error occurred",
+                    iconClass: "text-destructive",
+                };
+            default:
+                return null;
         }
-      case "downloading":
-        return {
-          icon: Spinner,
-          title: "Downloading images...",
-          iconClass: "text-foreground",
-        }
-      case "processing":
-        return {
-          icon: Spinner,
-          title: "Applying frame overlay...",
-          iconClass: "text-foreground",
-        }
-      case "zipping":
-        return {
-          icon: Spinner,
-          title: "Creating ZIP...",
-          iconClass: "text-foreground",
-        }
-      case "complete":
-        return {
-          icon: CheckCircle2,
-          title: "Processing complete!",
-          iconClass: "text-green-500",
-        }
-      case "error":
-        return {
-          icon: AlertCircle,
-          title: "Error occurred",
-          iconClass: "text-destructive",
-        }
-      default:
-        return null
-    }
-  }
+    };
 
-  const config = getStatusConfig()
-  if (!config && !error) return null
+    const config = getStatusConfig();
+    if (!config && !error) return null;
 
-  const Icon = config?.icon || AlertCircle
-  const progressPercent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
+    const Icon = config?.icon || AlertCircle;
+    const progressPercent =
+        progress.total > 0
+            ? Math.round((progress.current / progress.total) * 100)
+            : 0;
 
-  return (
-    <div
-      className={cn(
-        "rounded-xl border p-6",
-        state === "error" ? "border-destructive/50 bg-destructive/5" : "border-border bg-card",
-      )}
-    >
-      <div className="flex items-start gap-4">
+    return (
         <div
-          className={cn(
-            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-            state === "error" ? "bg-destructive/10" : "bg-muted",
-          )}
+            className={cn(
+                "rounded-xl border p-6",
+                state === "error"
+                    ? "border-destructive/50 bg-destructive/5"
+                    : "border-border bg-card",
+            )}
         >
-          <Icon className={cn("w-5 h-5", config?.iconClass)} />
-        </div>
+            <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center gap-1">
+                    <div
+                        className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                            state === "error"
+                                ? "bg-destructive/10"
+                                : "bg-muted",
+                        )}
+                    >
+                        <Icon className={cn("w-5 h-5", config?.iconClass)} />
+                    </div>
+                    {progress.total > 0 &&
+                        state !== "complete" &&
+                        state !== "error" && (
+                            <p className="text-sm font-semibold text-foreground leading-none">
+                                {progressPercent}%
+                            </p>
+                        )}
+                </div>
 
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground">{config?.title}</h3>
+                <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-foreground">
+                        {config?.title}
+                    </h3>
 
-          {error ? (
-            <p className="text-sm text-destructive mt-1">{error}</p>
-          ) : progress.message ? (
-            <p className="text-sm text-muted-foreground mt-1 truncate">{progress.message}</p>
-          ) : null}
+                    {error ? (
+                        <p className="text-sm text-destructive mt-1">{error}</p>
+                    ) : progress.message ? (
+                        <p className="text-sm text-muted-foreground mt-1 truncate">
+                            {progress.message}
+                        </p>
+                    ) : null}
 
-          {progress.total > 0 && state !== "complete" && state !== "error" && (
-            <div className="mt-3 space-y-2">
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-foreground transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {progress.current} of {progress.total} ({progressPercent}%)
-              </p>
+                    {progress.total > 0 &&
+                        state !== "complete" &&
+                        state !== "error" && (
+                            <div className="mt-3 space-y-2">
+                                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                    <div
+                                        className="h-full bg-foreground transition-all duration-300"
+                                        style={{ width: `${progressPercent}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {progress.current} of {progress.total} (
+                                    {progressPercent}%)
+                                </p>
+                            </div>
+                        )}
+                </div>
             </div>
-          )}
         </div>
-      </div>
-    </div>
-  )
+    );
 }
