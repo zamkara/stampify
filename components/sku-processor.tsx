@@ -925,7 +925,7 @@ export function SkuProcessor() {
                     )}
 
                     {isComplete && (
-                        <section className="space-y-4 p-6 bg-card border border-border rounded-xl">
+                        <section className="space-y-4 p-6 bg-card/40 border border-card/60 rounded-xl">
                             <div className="flex items-center justify-between flex-wrap gap-4">
                                 <div>
                                     <h2 className="text-lg font-semibold text-foreground">

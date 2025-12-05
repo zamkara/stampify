@@ -79,7 +79,7 @@ export function ProcessingStatus({
                 "rounded-xl border p-6",
                 state === "error"
                     ? "border-destructive/50 bg-destructive/5"
-                    : "border-border bg-card",
+                    : "border-card/60 bg-card/40",
             )}
         >
             <div className="flex items-start gap-4">
@@ -97,7 +97,7 @@ export function ProcessingStatus({
                     {progress.total > 0 &&
                         state !== "complete" &&
                         state !== "error" && (
-                            <p className="text-sm font-semibold text-foreground leading-none">
+                            <p className="text-sm font-semibold mt-2 text-foreground leading-none">
                                 {progressPercent}%
                             </p>
                         )}
