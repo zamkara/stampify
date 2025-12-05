@@ -42,7 +42,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
-            <body className="font-sans antialiased">
+            <body className="font-sans max-w-4xl mx-auto antialiased">
                 <div className="flex min-h-screen flex-col">
                     {children}
                     <footer className="ease-in-out duration-300 transition-all mx-auto items-center justify-center py-4 text-sm text-muted-foreground">

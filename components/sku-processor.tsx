@@ -5,14 +5,15 @@ import {
     useCallback,
     useEffect,
     useRef,
-    type RefObject,
     useMemo,
+    type RefObject,
+    type ChangeEvent,
 } from "react";
 import JSZip from "jszip";
-import { FileUploadZone } from "./file-upload-zone";
 import { CatalogPreview } from "./catalog-preview";
 import { ProcessingStatus } from "./processing-status";
 import { Header } from "./header";
+import { Logo } from "@/components/logo";
 import { parseSKUFile, type Catalog } from "@/lib/sku-parser";
 import { OrangeButton } from "@/components/ui/actbutton";
 import {
@@ -28,10 +29,9 @@ import {
     ArrowRight,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 
-type DownloadedImage = { data: string; filename?: string };
+export type DownloadedImage = { data: string; filename?: string };
 
 const getBase64Size = (dataUrl: string) => {
     const base64 = dataUrl.split(",")[1] || "";
@@ -50,6 +50,42 @@ const formatBytes = (bytes: number) => {
     return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 };
 
+const FRAME_MARKER = /^FRAME\b/i;
+const URL_IN_LINE_REGEX = /(https?:\/\/\S+)/i;
+
+const extractFrameInfo = (content: string) => {
+    const lines = content.split(/\r?\n/);
+    const kept: string[] = [];
+    let frameUrl: string | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (FRAME_MARKER.test(line)) {
+            const inlineUrl = line.replace(FRAME_MARKER, "").trim();
+            const inlineMatch = inlineUrl.match(URL_IN_LINE_REGEX)?.[0];
+            const nextLine = lines[i + 1]?.trim() || "";
+            const nextMatch = nextLine.match(URL_IN_LINE_REGEX)?.[0];
+            const detected = inlineMatch || nextMatch;
+
+            if (detected) {
+                frameUrl = detected;
+                if (!inlineMatch && nextMatch) {
+                    i += 1;
+                }
+                continue;
+            }
+            continue;
+        }
+
+        kept.push(rawLine);
+    }
+
+    return { frameUrl, cleanedText: kept.join("\n") };
+};
+
 export type ProcessingState =
     | "idle"
     | "parsing"
@@ -62,8 +98,8 @@ export type ProcessingState =
 export function SkuProcessor() {
     const [skuFile, setSkuFile] = useState<File | null>(null);
     const [skuText, setSkuText] = useState("");
-    const [frameFile, setFrameFile] = useState<File | null>(null);
     const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
+    const [frameSource, setFrameSource] = useState<string | null>(null);
     const [catalogs, setCatalogs] = useState<Catalog[]>([]);
     const [processingState, setProcessingState] =
         useState<ProcessingState>("idle");
@@ -91,6 +127,7 @@ export function SkuProcessor() {
     const completeSoundRef = useRef<HTMLAudioElement | null>(null);
     const hasPlayedCompleteSoundRef = useRef(false);
     const cancelRequestedRef = useRef(false);
+    const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         downloadSoundRef.current = new Audio(
@@ -113,8 +150,8 @@ export function SkuProcessor() {
     }, []);
 
     const playSound = useCallback(
-        (audioRef: RefObject<HTMLAudioElement | null>) => {
-            const audio = audioRef.current;
+        (audioRef: RefObject<HTMLAudioElement | null | undefined>) => {
+            const audio = audioRef?.current;
             if (audio) {
                 audio.currentTime = 0;
                 audio.play().catch(() => null);
@@ -149,7 +186,7 @@ export function SkuProcessor() {
         if (previewIndex !== null && previewIndex >= flattenedImages.length) {
             setPreviewIndex(flattenedImages.length ? 0 : null);
         }
-    }, [previewIndex, flattenedImages.length]);
+    }, [previewIndex, flattenedImages]);
 
     useEffect(() => {
         if (previewIndex === null) {
@@ -216,94 +253,140 @@ export function SkuProcessor() {
         return () => window.removeEventListener("keydown", handler);
     }, [previewIndex, navigatePreview, closePreview]);
 
-    const handleSkuUpload = useCallback(async (file: File) => {
-        setSkuFile(file);
-        setProcessingState("parsing");
-        setError(null);
+    const downloadImage = useCallback(
+        async (url: string): Promise<DownloadedImage[] | null> => {
+            try {
+                const response = await fetch("/api/download", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url }),
+                });
 
-        try {
-            const text = await file.text();
-            const parsed = parseSKUFile(text);
-            setCatalogs(parsed);
-            setProcessingState("idle");
-        } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Failed to parse SKU file",
-            );
-            setProcessingState("error");
-        }
-    }, []);
-
-    const handleFrameUpload = useCallback((file: File) => {
-        setFrameFile(file);
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                setFrameImage(img);
-                console.log(
-                    "[v0] Frame image loaded:",
-                    img.width,
-                    "x",
-                    img.height,
-                );
-            };
-            img.onerror = () => {
-                console.error("[v0] Failed to load frame image");
-                setFrameImage(null);
-            };
-            img.src = e.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-    }, []);
-
-    const downloadImage = async (
-        url: string,
-    ): Promise<DownloadedImage[] | null> => {
-        try {
-            const response = await fetch("/api/download", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (Array.isArray(data.images)) {
-                    return data.images
-                        .map((img: any) => {
-                            const base =
-                                typeof img?.data === "string" ? img.data : null;
-                            const filename =
-                                typeof img?.filename === "string"
-                                    ? img.filename
-                                    : undefined;
-                            return base ? { data: base, filename } : null;
-                        })
-                        .filter(
-                            (
-                                img: DownloadedImage | null,
-                            ): img is DownloadedImage => Boolean(img),
-                        );
+                if (response.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data.images)) {
+                        return data.images
+                            .map((img: any) => {
+                                const base =
+                                    typeof img?.data === "string"
+                                        ? img.data
+                                        : null;
+                                const filename =
+                                    typeof img?.filename === "string"
+                                        ? img.filename
+                                        : undefined;
+                                return base ? { data: base, filename } : null;
+                            })
+                            .filter(
+                                (
+                                    img: DownloadedImage | null,
+                                ): img is DownloadedImage => Boolean(img),
+                            );
+                    }
+                    if (data.imageData) {
+                        return [{ data: data.imageData }];
+                    }
                 }
-                if (data.imageData) {
-                    return [{ data: data.imageData }];
-                }
+                return null;
+            } catch {
+                return null;
             }
-            return null;
-        } catch {
-            return null;
+        },
+        [],
+    );
+
+    const loadFrameFromUrl = useCallback(
+        async (url: string | null) => {
+            if (!url) {
+                setFrameImage(null);
+                setFrameSource(null);
+                return;
+            }
+
+            setFrameSource(url);
+            setFrameImage(null);
+            try {
+                const images = await downloadImage(url);
+                if (!images?.length) {
+                    throw new Error("Tidak bisa mengambil gambar frame");
+                }
+                const data = images[0].data;
+                await new Promise<void>((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        setFrameImage(img);
+                        resolve();
+                    };
+                    img.onerror = () => resolve();
+                    img.src = data;
+                });
+            } catch (err) {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Gagal memuat frame dari link",
+                );
+                setFrameImage(null);
+            }
+        },
+        [downloadImage],
+    );
+
+    const handleSkuUpload = useCallback(
+        async (file: File) => {
+            setSkuFile(file);
+            setProcessingState("parsing");
+            setError(null);
+
+            try {
+                const text = await file.text();
+                const { frameUrl, cleanedText } = extractFrameInfo(text);
+                const parsed = parseSKUFile(cleanedText);
+                setCatalogs(parsed);
+                await loadFrameFromUrl(frameUrl);
+                setProcessingState("idle");
+            } catch (err) {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to parse SKU file",
+                );
+                setProcessingState("error");
+            }
+        },
+        [loadFrameFromUrl],
+    );
+
+    const handleLogoClick = () => {
+        uploadInputRef.current?.click();
+    };
+
+    const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null;
+        if (file) {
+            handleSkuUpload(file);
         }
+        e.target.value = "";
     };
 
     const handlePasteParse = async () => {
-        if (!skuText.trim()) return;
         setParsingPaste(true);
         setError(null);
+        setProcessingState("parsing");
         try {
-            const parsed = parseSKUFile(skuText);
+            if (!navigator?.clipboard?.readText) {
+                throw new Error("Clipboard tidak tersedia di browser ini");
+            }
+            const text = await navigator.clipboard.readText();
+            if (!text.trim()) {
+                throw new Error("Clipboard kosong atau tidak ada teks");
+            }
+            setSkuText(text);
+
+            const { frameUrl, cleanedText } = extractFrameInfo(text);
+            const parsed = parseSKUFile(cleanedText);
             setCatalogs(parsed);
+            await loadFrameFromUrl(frameUrl);
             setSkuFile(null);
             setProcessingState("idle");
         } catch (err) {
@@ -317,7 +400,7 @@ export function SkuProcessor() {
     };
 
     const applyFrameWithCanvas = (imageData: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             if (!frameImage) {
                 resolve(imageData);
                 return;
@@ -332,20 +415,12 @@ export function SkuProcessor() {
                     const ctx = canvas.getContext("2d");
 
                     if (!ctx) {
-                        console.error("[v0] Failed to get canvas context");
                         resolve(imageData);
                         return;
                     }
 
                     canvas.width = baseImg.width;
                     canvas.height = baseImg.height;
-
-                    console.log(
-                        "[v0] Canvas size:",
-                        canvas.width,
-                        "x",
-                        canvas.height,
-                    );
 
                     ctx.drawImage(baseImg, 0, 0);
 
@@ -357,18 +432,14 @@ export function SkuProcessor() {
                         canvas.height,
                     );
 
-                    console.log("[v0] Frame overlay applied successfully");
-
                     const result = canvas.toDataURL("image/png", 1.0);
                     resolve(result);
-                } catch (err) {
-                    console.error("[v0] Canvas processing error:", err);
+                } catch {
                     resolve(imageData);
                 }
             };
 
             baseImg.onerror = () => {
-                console.error("[v0] Failed to load base image for canvas");
                 resolve(imageData);
             };
 
@@ -513,7 +584,6 @@ export function SkuProcessor() {
                 );
             }
         } catch (err) {
-            console.error("Processing error:", err);
             setError(err instanceof Error ? err.message : "Processing failed");
             setProcessingState("error");
         }
@@ -666,7 +736,7 @@ export function SkuProcessor() {
 
             const blob = await zip.generateAsync(
                 { type: "blob" },
-                (metadata) => {
+                (metadata: JSZip.JSZipGeneratorProgress) => {
                     setProgress({
                         current: Math.round(metadata.percent),
                         total: 100,
@@ -723,8 +793,9 @@ export function SkuProcessor() {
 
     const handleReset = () => {
         setSkuFile(null);
-        setFrameFile(null);
+        setSkuText("");
         setFrameImage(null);
+        setFrameSource(null);
         setCatalogs([]);
         setProcessingState("idle");
         setProgress({ current: 0, total: 0, message: "" });
@@ -753,77 +824,69 @@ export function SkuProcessor() {
     const currentPreview =
         previewIndex !== null ? flattenedImages[previewIndex] : null;
 
+    const hasInputInfo =
+        Boolean(skuFile) || catalogs.length > 0 || frameSource || frameImage;
+    const fileLabel = skuFile
+        ? `File selected: ${skuFile.name}`
+        : catalogs.length > 0
+          ? "Parsed from clipboard"
+          : null;
+
     return (
         <div className="flex flex-col min-h-screen">
             <Header />
 
-            <div className="flex-1 container max-w-6xl mx-auto px-4 py-8">
-                <div className="space-y-8">
-                    <section className="grid md:grid-cols-2 gap-6">
-                        <Tabs defaultValue="upload" className="space-y-4">
-                            <TabsList className="grid grid-cols-2 w-full">
-                                <TabsTrigger value="upload">
-                                    Upload SKU file
-                                </TabsTrigger>
-                                <TabsTrigger value="paste">
-                                    Paste links
-                                </TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="upload">
-                                <FileUploadZone
-                                    title="Upload SKU File"
-                                    description="Text/TSV file containing folder paths with Google Drive or direct image links"
-                                    accept=".txt,.tsv,.csv"
-                                    className="-mb-4"
-                                    onUpload={handleSkuUpload}
-                                    file={skuFile}
-                                    icon="file"
-                                    subtitle="Recommended"
+            <div className="flex-1 container w-full mx-auto px-4 py-8">
+                <div className="space-y-8 mx-auto items-center justify-center flex flex-col">
+                    <section className="space-y-4 rounded-xl py-10 w-fit px-20 bg-card/20">
+                        <div className="flex flex-col items-center gap-4 text-center">
+                            <button
+                                type="button"
+                                onClick={handleLogoClick}
+                                className="group transition-all duration-300 px-6 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                            >
+                                <Logo
+                                    className="size-26"
+                                    processState={
+                                        catalogs.length > 0 ||
+                                        processingState !== "idle"
+                                            ? "active"
+                                            : "idle"
+                                    }
                                 />
-                            </TabsContent>
-                            <TabsContent value="paste">
-                                <div className="rounded-xl border bg-card p-4 space-y-3">
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <ClipboardPaste className="w-4 h-4" />
-                                        Paste list of links
-                                    </div>
-                                    <Textarea
-                                        className="min-h-[180px]"
-                                        placeholder="Example:&#10;katalog/katalog-produk-1/raw    https://drive.google.com/file/d/.../view&#10;katalog/katalog-produk-2/final/image-1.png    https://cdn.domain.com/path/to/file.png"
-                                        value={skuText}
-                                        onChange={(e) =>
-                                            setSkuText(e.target.value)
-                                        }
-                                    />
-                                    <div className="flex justify-end">
-                                        <OrangeButton
-                                            onClick={handlePasteParse}
-                                            disabled={parsingPaste}
-                                        >
-                                            {parsingPaste && (
-                                                <Spinner className="mr-2" />
-                                            )}
-                                            {parsingPaste
-                                                ? "Processing..."
-                                                : "Parse text"}
-                                        </OrangeButton>
-                                    </div>
+                            </button>
+                            <input
+                                ref={uploadInputRef}
+                                type="file"
+                                accept=".txt,.tsv,.csv"
+                                className="hidden"
+                                onChange={handleFileInputChange}
+                            />
+                            <OrangeButton
+                                onClick={handlePasteParse}
+                                disabled={parsingPaste}
+                            >
+                                {parsingPaste && <Spinner className="mr-2" />}
+                                {parsingPaste
+                                    ? "Processing..."
+                                    : "Clear & Paste"}
+                            </OrangeButton>
+
+                            {hasInputInfo && (
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                    {fileLabel && <p>{fileLabel}</p>}
+                                    {frameSource && (
+                                        <p>Frame URL: {frameSource}</p>
+                                    )}
+                                    {frameImage && (
+                                        <p>
+                                            Frame loaded: {frameImage.width}x
+                                            {frameImage.height}px
+                                        </p>
+                                    )}
                                 </div>
-                            </TabsContent>
-                        </Tabs>
-                        <FileUploadZone
-                            title="Upload Frame"
-                            description="PNG image to overlay all downloaded images"
-                            accept="image/png"
-                            onUpload={handleFrameUpload}
-                            file={frameFile}
-                            icon="image"
-                            subtitle={
-                                frameImage
-                                    ? `Frame loaded: ${frameImage.width}x${frameImage.height}px`
-                                    : undefined
-                            }
-                        />
+                            )}
+                        </div>
                     </section>
 
                     {catalogs.length > 0 && (
@@ -987,7 +1050,7 @@ export function SkuProcessor() {
                             </button>
                         </div>
                         <div className="flex flex-col md:flex-row gap-6 p-2 pe-6">
-                            <div className="flex-1 `min-h-80 bg-muted rounded-md overflow-hidden flex items-center justify-center border border-border">
+                            <div className="flex-1 min-h-80 bg-muted rounded-md overflow-hidden flex items-center justify-center border border-border">
                                 <img
                                     src={currentPreview.data}
                                     alt={`${currentPreview.path} ${currentPreview.filename}`}
@@ -1007,7 +1070,7 @@ export function SkuProcessor() {
                                     <p className="text-xs text-muted-foreground">
                                         Path
                                     </p>
-                                    <p className="text-sm font-medium `wrap-break-word">
+                                    <p className="text-sm font-medium break-words">
                                         {currentPreview.path || "-"}
                                     </p>
                                 </div>
