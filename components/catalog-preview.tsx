@@ -7,10 +7,10 @@ interface CatalogPreviewProps {
 
 export function CatalogPreview({ catalogs }: CatalogPreviewProps) {
     return (
-        <div className="rounded-xl border border-border bg-card mt-8 overflow-hidden">
+        <div className="rounded-xl border border-card/60 mt-8 bg-card/20 overflow-hidden">
             <div className="max-h-[300px] overflow-y-auto">
                 <table className="w-full">
-                    <thead className="bg-linear-to-b from-muted via-muted to-muted/0 sticky top-0">
+                    <thead className="bg-card/40 backdrop-blur-xl sticky top-0">
                         <tr>
                             <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
                                 Folder Path
@@ -24,7 +24,7 @@ export function CatalogPreview({ catalogs }: CatalogPreviewProps) {
                         {catalogs.map((catalog, idx) => (
                             <tr
                                 key={idx}
-                                className="hover:bg-muted/30 transition-colors"
+                                className="hover:bg-muted/30 border-card/80 transition-colors"
                             >
                                 <td className="px-4 py-3">
                                     <div className="flex items-center gap-3">

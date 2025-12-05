@@ -28,7 +28,7 @@ export function OrangeButton({
                 boxShadow: `
           inset 0px 4px 8px 0px #FF7348,
           inset 0px -4px 8px 0px #DE3B00,
-          0px 8px 20px -4px rgba(255, 112, 23, 0.5),
+          0px 8px 10px -4px rgba(255, 112, 23, 0.2),
           0px 4px 8px -2px rgba(0, 0, 0, 0.15)
         `,
             }}

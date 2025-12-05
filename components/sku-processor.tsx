@@ -20,7 +20,6 @@ import {
     Play,
     Trash2,
     RotateCcw,
-    ClipboardPaste,
     Square,
     X,
     Eye,
@@ -28,8 +27,7 @@ import {
     ArrowRight,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "./ui/switch";
 
 type DownloadedImage = { data: string; filename?: string };
 
@@ -50,6 +48,23 @@ const formatBytes = (bytes: number) => {
     return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 };
 
+const dedupeCatalogs = (input: Catalog[]): Catalog[] => {
+    const map = new Map<string, Catalog>();
+    input.forEach((cat) => {
+        const existing = map.get(cat.path);
+        const base = existing ?? { ...cat, files: [] };
+        const seen = new Set(base.files.map((f) => f.url));
+        cat.files.forEach((file) => {
+            if (!seen.has(file.url)) {
+                base.files.push(file);
+                seen.add(file.url);
+            }
+        });
+        map.set(cat.path, base);
+    });
+    return Array.from(map.values());
+};
+
 export type ProcessingState =
     | "idle"
     | "parsing"
@@ -62,6 +77,7 @@ export type ProcessingState =
 export function SkuProcessor() {
     const [skuFile, setSkuFile] = useState<File | null>(null);
     const [skuText, setSkuText] = useState("");
+    const [showEditor, setShowEditor] = useState(false);
     const [frameFile, setFrameFile] = useState<File | null>(null);
     const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
     const [catalogs, setCatalogs] = useState<Catalog[]>([]);
@@ -79,7 +95,6 @@ export function SkuProcessor() {
     const [failedDownloads, setFailedDownloads] = useState<
         { path: string; url: string; filename: string }[]
     >([]);
-    const [parsingPaste, setParsingPaste] = useState(false);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
     const [previewMeta, setPreviewMeta] = useState<{
         width?: number;
@@ -91,6 +106,7 @@ export function SkuProcessor() {
     const completeSoundRef = useRef<HTMLAudioElement | null>(null);
     const hasPlayedCompleteSoundRef = useRef(false);
     const cancelRequestedRef = useRef(false);
+    const lastParsedTextRef = useRef("");
 
     useEffect(() => {
         downloadSoundRef.current = new Audio(
@@ -218,21 +234,70 @@ export function SkuProcessor() {
 
     const handleSkuUpload = useCallback(async (file: File) => {
         setSkuFile(file);
-        setProcessingState("parsing");
         setError(null);
 
         try {
             const text = await file.text();
-            const parsed = parseSKUFile(text);
+            setSkuText(text.trim());
+        } catch (err) {
+            setError(
+                err instanceof Error ? err.message : "Failed to read SKU file",
+            );
+        }
+    }, []);
+
+    const handleSkuTextInput = useCallback((text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        setSkuText((prev) => (prev.trim() ? `${prev}\n${trimmed}` : trimmed));
+    }, []);
+
+    useEffect(() => {
+        const handlePasteAnywhere = (event: ClipboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (
+                target &&
+                (target.tagName?.toLowerCase() === "input" ||
+                    target.tagName?.toLowerCase() === "textarea" ||
+                    target.isContentEditable)
+            ) {
+                return;
+            }
+            const text = event.clipboardData?.getData("text")?.trim();
+            if (!text) return;
+            setSkuText((prev) => (prev.trim() ? `${prev}\n${text}` : text));
+        };
+
+        window.addEventListener("paste", handlePasteAnywhere);
+        return () => window.removeEventListener("paste", handlePasteAnywhere);
+    }, []);
+
+    useEffect(() => {
+        const trimmed = skuText.trim();
+        if (trimmed === lastParsedTextRef.current) return;
+
+        setProcessingState("parsing");
+        setError(null);
+
+        if (!trimmed) {
+            setCatalogs([]);
+            lastParsedTextRef.current = "";
+            setProcessingState("idle");
+            return;
+        }
+
+        try {
+            const parsed = dedupeCatalogs(parseSKUFile(trimmed));
             setCatalogs(parsed);
+            lastParsedTextRef.current = trimmed;
             setProcessingState("idle");
         } catch (err) {
             setError(
-                err instanceof Error ? err.message : "Failed to parse SKU file",
+                err instanceof Error ? err.message : "Failed to parse text",
             );
             setProcessingState("error");
         }
-    }, []);
+    }, [skuText]);
 
     const handleFrameUpload = useCallback((file: File) => {
         setFrameFile(file);
@@ -294,25 +359,6 @@ export function SkuProcessor() {
             return null;
         } catch {
             return null;
-        }
-    };
-
-    const handlePasteParse = async () => {
-        if (!skuText.trim()) return;
-        setParsingPaste(true);
-        setError(null);
-        try {
-            const parsed = parseSKUFile(skuText);
-            setCatalogs(parsed);
-            setSkuFile(null);
-            setProcessingState("idle");
-        } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Failed to parse text",
-            );
-            setProcessingState("error");
-        } finally {
-            setParsingPaste(false);
         }
     };
 
@@ -723,6 +769,7 @@ export function SkuProcessor() {
 
     const handleReset = () => {
         setSkuFile(null);
+        setSkuText("");
         setFrameFile(null);
         setFrameImage(null);
         setCatalogs([]);
@@ -734,6 +781,7 @@ export function SkuProcessor() {
         cancelRequestedRef.current = false;
         setPreviewIndex(null);
         setPreviewMeta(null);
+        lastParsedTextRef.current = "";
     };
 
     const totalUrls = catalogs.reduce((acc, cat) => acc + cat.files.length, 0);
@@ -760,57 +808,54 @@ export function SkuProcessor() {
             <div className="flex-1 container max-w-6xl mx-auto px-4 py-8">
                 <div className="space-y-8">
                     <section className="grid md:grid-cols-2 gap-6">
-                        <Tabs defaultValue="upload" className="space-y-4">
-                            <TabsList className="grid grid-cols-2 w-full">
-                                <TabsTrigger value="upload">
-                                    Upload SKU file
-                                </TabsTrigger>
-                                <TabsTrigger value="paste">
-                                    Paste links
-                                </TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="upload">
-                                <FileUploadZone
-                                    title="Upload SKU File"
-                                    description="Text/TSV file containing folder paths with Google Drive or direct image links"
-                                    accept=".txt,.tsv,.csv"
-                                    className="-mb-4"
-                                    onUpload={handleSkuUpload}
-                                    file={skuFile}
-                                    icon="file"
-                                    subtitle="Recommended"
-                                />
-                            </TabsContent>
-                            <TabsContent value="paste">
-                                <div className="rounded-xl border bg-card p-4 space-y-3">
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <ClipboardPaste className="w-4 h-4" />
-                                        Paste list of links
-                                    </div>
+                        <div className="rounded-xl border-2 overflow-hidden border-dashed">
+                            {showEditor ? (
+                                <div className="space-y-3">
                                     <Textarea
-                                        className="min-h-[180px]"
-                                        placeholder="Example:&#10;katalog/katalog-produk-1/raw    https://drive.google.com/file/d/.../view&#10;katalog/katalog-produk-2/final/image-1.png    https://cdn.domain.com/path/to/file.png"
+                                        className="min-h-60 resize-none rounded-none border-none p-6"
+                                        placeholder="folder/sku-1    https://drive.google.com/file/d/...&#10;folder/sku-2    https://cdn.domain.com/image.png"
                                         value={skuText}
                                         onChange={(e) =>
                                             setSkuText(e.target.value)
                                         }
                                     />
-                                    <div className="flex justify-end">
-                                        <OrangeButton
-                                            onClick={handlePasteParse}
-                                            disabled={parsingPaste}
-                                        >
-                                            {parsingPaste && (
-                                                <Spinner className="mr-2" />
-                                            )}
-                                            {parsingPaste
-                                                ? "Processing..."
-                                                : "Parse text"}
-                                        </OrangeButton>
-                                    </div>
                                 </div>
-                            </TabsContent>
-                        </Tabs>
+                            ) : (
+                                <FileUploadZone
+                                    title="Upload List"
+                                    description="Use files like .txt or other supported types"
+                                    accept=".txt,.tsv,.csv,.json,.xml"
+                                    className="border-none rounded-sm"
+                                    onUpload={handleSkuUpload}
+                                    onPasteText={handleSkuTextInput}
+                                    file={skuFile}
+                                    icon="file"
+                                    subtitle="Recommended"
+                                />
+                            )}
+                            <div className="flex items-center justify-between gap-3">
+                                {/*<div>
+                                    <p className="text-sm font-medium text-foreground">
+                                        SKU Source
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Drop files or paste.
+                                    </p>
+                                </div>*/}
+                                <div className="flex w-full border-t border-card/80 bg-card/40 p-4 ps-4 items-center gap-4 text-sm text-muted-foreground">
+                                    <span className="w-full ps-1">
+                                        Edit mode
+                                    </span>
+                                    <Switch
+                                        checked={showEditor}
+                                        onCheckedChange={(val) =>
+                                            setShowEditor(val)
+                                        }
+                                        aria-label="Toggle edit mode"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                         <FileUploadZone
                             title="Upload Frame"
                             description="PNG image to overlay all downloaded images"

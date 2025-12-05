@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ClipboardEvent } from "react";
 import { useDropzone } from "react-dropzone";
 import { FileText, ImageIcon, Upload, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ interface FileUploadZoneProps {
     icon: "file" | "image";
     subtitle?: string;
     className?: string;
+    onPasteText?: (text: string) => void;
 }
 
 export function FileUploadZone({
@@ -25,6 +26,7 @@ export function FileUploadZone({
     icon,
     subtitle,
     className,
+    onPasteText,
 }: FileUploadZoneProps) {
     const [isDragActive, setIsDragActive] = useState(false);
 
@@ -47,13 +49,30 @@ export function FileUploadZone({
         onDragLeave: () => setIsDragActive(false),
     });
 
+    const handlePaste = useCallback(
+        (event: ClipboardEvent<HTMLDivElement>) => {
+            if (!onPasteText) return;
+            const text = event.clipboardData.getData("text");
+            if (text.trim()) {
+                event.preventDefault();
+                onPasteText(text);
+            }
+        },
+        [onPasteText],
+    );
+
+    const rootProps = getRootProps({ onPaste: handlePaste });
     const IconComponent = icon === "file" ? FileText : ImageIcon;
+    const helperText = onPasteText
+        ? "Place the text file here"
+        : "Drop or browse";
 
     return (
         <div
-            {...getRootProps()}
+            {...rootProps}
             className={cn(
                 "relative rounded-xl border-2 border-dashed p-8 transition-all cursor-pointer",
+                "flex flex-col items-center justify-center text-center",
                 "hover:border-muted-foreground/50 hover:bg-card/50",
                 isDragActive && "border-foreground bg-card",
                 file ? "border-orange-200/10" : "border-border",
@@ -100,7 +119,7 @@ export function FileUploadZone({
                 ) : (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Upload className="w-4 h-4" />
-                        <span>Drop file or click to browse</span>
+                        <span>{helperText}</span>
                     </div>
                 )}
             </div>
